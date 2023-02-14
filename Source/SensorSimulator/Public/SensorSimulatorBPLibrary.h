@@ -2,7 +2,15 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+
+#include "Engine/Engine.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/SceneCaptureComponent2D.h"
+#include "LidarPointCloud.h"
+#include "LidarPointCloudComponent.h"
+
 #include "SensorSimulatorBPLibrary.generated.h"
 
 /* 
@@ -22,11 +30,32 @@
 *	For more info on custom blueprint nodes visit documentation:
 *	https://wiki.unrealengine.com/Custom_Blueprint_Node_Creation
 */
+
+USTRUCT(BlueprintType)
+struct FLidarSensorOut
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<float> depthArrayOut;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<FColor> colorArrayOut;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<FLidarPointCloudPoint> lidarPointsOut;
+};
+
+DECLARE_DYNAMIC_DELEGATE_OneParam(FAsyncDelegate, FLidarSensorOut, SensorOut);
+
 UCLASS()
 class USensorSimulatorBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_UCLASS_BODY()
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Execute Sample function", Keywords = "SensorSimulator sample test testing"), Category = "SensorSimulatorTesting")
-	static float SensorSimulatorSampleFunction(float Param);
+		UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "LidarScan", Keywords = "LidarSensorSimulator Async Scan"))
+		static void LidarSensorAsyncScan4(
+			const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPointCloudComponent* lidarPointCloud, USceneCaptureComponent2D* sceneCapture,
+			TArray<FLidarPointCloudPoint>& lidarPointsOut, TArray<float>& depthArrayOut, TArray<FColor>& colorArrayOut,
+			FAsyncDelegate Out, const bool asyncScan = true,
+			const float vFovSDeg = -15.f, const float vFovEDeg = 15.f, const int lidarChannels = 32, const float hfovDeg = 90.f, const int lidarResolution = 100, const float lidarRange = 1000.f);
 };
