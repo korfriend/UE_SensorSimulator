@@ -43,13 +43,6 @@ public:
 		TArray<FColor> colorArrayOut;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		TArray<FLidarPointCloudPoint> lidarPointsOut;
-
-	CORE_API bool DepthArrayToBytes(TArray<uint8>& bytes) {
-		if (depthArrayOut.Num() == 0) return false;
-		bytes.Init(0, depthArrayOut.Num() * 4);
-		memcpy(&bytes[0], &depthArrayOut[0], depthArrayOut.Num() * 4);
-		return true;
-	}
 };
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FAsyncDelegate, FLidarSensorOut, SensorOut);
@@ -59,10 +52,13 @@ class USensorSimulatorBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_UCLASS_BODY()
 
-		UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "LidarScan", Keywords = "LidarSensorSimulator Async Scan"))
-		static void LidarSensorAsyncScan4(
-			const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPointCloudComponent* lidarPointCloud, USceneCaptureComponent2D* sceneCapture,
-			TArray<FLidarPointCloudPoint>& lidarPointsOut, TArray<float>& depthArrayOut, TArray<FColor>& colorArrayOut,
-			FAsyncDelegate Out, const bool asyncScan = true,
-			const float vFovSDeg = -15.f, const float vFovEDeg = 15.f, const int lidarChannels = 32, const float hfovDeg = 90.f, const int lidarResolution = 100, const float lidarRange = 1000.f);
+	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "LidarScan", Keywords = "LidarSensorSimulator Async Scan"))
+	static void LidarSensorAsyncScan4(
+		const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPointCloudComponent* lidarPointCloud, USceneCaptureComponent2D* sceneCapture,
+		FAsyncDelegate Out, FLidarSensorOut& sensorOut, const bool asyncScan = true,
+		const float vFovSDeg = -15.f, const float vFovEDeg = 15.f, const int lidarChannels = 32, const float hfovDeg = 90.f, const int lidarResolution = 100, const float lidarRange = 1000.f);
+
+	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "SensorOutToBytes", Keywords = "Sensor Out to Bytes Array"))
+	static void SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray<uint8>& bytes, FString& bytesInfo);
 };
+
