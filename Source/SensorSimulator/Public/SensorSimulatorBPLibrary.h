@@ -43,6 +43,14 @@ public:
 		TArray<FColor> colorArrayOut;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		TArray<FLidarPointCloudPoint> lidarPointsOut;
+
+	UFUNCTION(BlueprintCallable)
+	bool DepthArrayToBytes(TArray<uint8>& bytes) {
+		if (depthArrayOut.Num() == 0) return false;
+		bytes.Init(0, depthArrayOut.Num() * 4);
+		memcpy(&bytes[0], &depthArrayOut[0], depthArrayOut.Num() * 4);
+		return true;
+	}
 };
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FAsyncDelegate, FLidarSensorOut, SensorOut);
