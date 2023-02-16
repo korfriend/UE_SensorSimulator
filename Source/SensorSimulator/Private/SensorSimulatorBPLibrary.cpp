@@ -10,10 +10,10 @@
 
 #include <map>
 
-#include "opencv2/core.hpp"
-#include "opencv2/highgui.hpp"    
-#include "opencv2/imgproc.hpp"
-#include "opencv2/videoio.hpp"
+//#include "opencv2/core.hpp"
+//#include "opencv2/highgui.hpp"    
+//#include "opencv2/imgproc.hpp"
+//#include "opencv2/videoio.hpp"
 
 std::map<USceneCaptureComponent2D*, bool> mapCompleted;
 
@@ -118,6 +118,7 @@ auto LidarScan = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPoin
 			FHitResult outHit;
 			if (currentWorld->LineTraceSingleByObjectType(outHit, posChannelStart, posChannelEnd, targetObjTypes)) {
 				//FVector3f hitPosition = FVector3f(outHit.Location);
+				// we need the local space position rather than world space position
 				FVector3f hitPosition = FVector3f(vecRot * outHit.Distance);
 
 				//UMeshComponent* meshComponent = outHit.GetActor()->GetComponentByClass(UMeshComponent::StaticClass());
@@ -130,17 +131,17 @@ auto LidarScan = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPoin
 				// to do //
 				if (RenderTargetResource) {
 					FVector3f hitPositionWS = FVector3f(outHit.Location);
-					FPlane wsPlane = ViewProjectionMatrix.TransformFVector4(FVector4(hitPositionWS, 1.f));
-					float NormalizedX = (wsPlane.X / (wsPlane.W * 2.f)) + 0.5f;
-					float NormalizedY = 1.f - (wsPlane.Y / (wsPlane.W * 2.f)) - 0.5f;
+					FPlane psPlane = ViewProjectionMatrix.TransformFVector4(FVector4(hitPositionWS, 1.f));
+					float NormalizedX = (psPlane.X / (psPlane.W * 2.f)) + 0.5f;
+					float NormalizedY = 1.f - (psPlane.Y / (psPlane.W * 2.f)) - 0.5f;
 					FVector2D ScreenPos = FVector2D(NormalizedX * texWidth, NormalizedY * texHeight);
 					int sx = (int)ScreenPos.X;
 					int sy = (int)ScreenPos.Y;
 					FColor color(0, 255, 0, 255);
-					if (sx >= 0 && sx < texWidth && sy >= 0 && sy < texHeight && wsPlane.Z / wsPlane.W > 0) {
+					if (sx >= 0 && sx < texWidth && sy >= 0 && sy < texHeight && psPlane.Z / psPlane.W > 0) {
 						color = buffer[sx + sy * texWidth];
 					}
-					//if (wsPlane.Z / wsPlane.W > 0) {
+					//if (psPlane.Z / psPlane.W > 0) {
 					//	color = FColor(255, 0, 0, 255);
 					//}
 					FLidarPointCloudPoint pcPoint(hitPosition, color, true, 0);

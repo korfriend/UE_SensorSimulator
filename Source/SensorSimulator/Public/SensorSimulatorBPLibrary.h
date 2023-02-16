@@ -31,6 +31,7 @@
 *	https://wiki.unrealengine.com/Custom_Blueprint_Node_Creation
 */
 
+// https://forums.unrealengine.com/t/ufunction-in-ustruct/354167/4
 USTRUCT(BlueprintType)
 struct FLidarSensorOut
 {
