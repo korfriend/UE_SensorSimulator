@@ -28,13 +28,6 @@
 		{
 			"Name": "LidarPointCloud",
 			"Enabled": true
-		},
-		{
-			"Name": "ExOpenCV",
-			"Enabled": true,
-			"SupportedTargetPlatforms": [
-				"Win64"
-			]
 		}
 	]
 }
