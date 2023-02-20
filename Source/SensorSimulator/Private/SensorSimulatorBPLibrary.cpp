@@ -206,7 +206,7 @@ void USensorSimulatorBPLibrary::LidarSensorAsyncScan4(
 }
 
 
-void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray<uint8>& bytes, FString& bytesInfo)
+void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray <FBytes>& bytePackets, FString& bytesInfo, const int packetBytes)
 {
 	// compute array size
 	uint32 bytesCount = 0;
@@ -226,6 +226,8 @@ void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& 
 		}
 		index++;
 	}
+	GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, FString::FromInt(bytesCount));
+	TArray<uint8> bytes;
 	bytes.Init(0, bytesCount);
 	uint32 offset = 0;
 	for (const FLidarSensorOut& sensorOut : lidarSensorOuts) {
@@ -245,5 +247,18 @@ void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& 
 			memcpy(&bytes[offset], &sensorOut.colorArrayOut[0], sensorOut.colorArrayOut.Num() * 4);
 			offset += sensorOut.colorArrayOut.Num() * 4;
 		}
+	}
+	//TArray<TArray<uint8>> bytePackets;
+	int numPackets = (int)ceil((float)bytesCount / (float)packetBytes);
+	bytePackets.Init(FBytes(), numPackets);
+	int remainingBytes = bytesCount;
+	offset = 0;
+	for (FBytes& packet : bytePackets) {
+		int packetSize = std::min(packetBytes, remainingBytes);
+		packet.ArrayOut.Init(0, packetSize);
+		memcpy(&packet.ArrayOut[0], &bytes[offset], packetSize);
+		
+		remainingBytes -= packetSize;
+		offset += packetSize;
 	}
 }

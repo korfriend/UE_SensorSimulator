@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include <Containers/Array.h>
 
 #include "Engine/Engine.h"
 #include "Components/StaticMeshComponent.h"
@@ -46,6 +47,16 @@ public:
 		TArray<FLidarPointCloudPoint> lidarPointsOut;
 };
 
+USTRUCT(BlueprintType)
+struct FBytes
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<uint8> ArrayOut;
+};
+
 DECLARE_DYNAMIC_DELEGATE_OneParam(FAsyncDelegate, FLidarSensorOut, SensorOut);
 
 UCLASS()
@@ -60,6 +71,6 @@ class USensorSimulatorBPLibrary : public UBlueprintFunctionLibrary
 		const float vFovSDeg = -15.f, const float vFovEDeg = 15.f, const int lidarChannels = 32, const float hfovDeg = 90.f, const int lidarResolution = 100, const float lidarRange = 1000.f);
 
 	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "SensorOutToBytes", Keywords = "Sensor Out to Bytes Array"))
-	static void SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray<uint8>& bytes, FString& bytesInfo);
+	static void SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray <FBytes>& bytePackets, FString& bytesInfo, const int packetBytes = 10000);
 };
 
