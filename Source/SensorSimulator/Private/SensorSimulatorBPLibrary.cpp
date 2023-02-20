@@ -206,59 +206,70 @@ void USensorSimulatorBPLibrary::LidarSensorAsyncScan4(
 }
 
 
-void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray <FBytes>& bytePackets, FString& bytesInfo, const int packetBytes)
+void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray<FBytes>& bytePackets, FString& bytesInfo, int& bytesPoints, int& bytesColorMap, int& bytesDepthMap, const int packetBytes)
 {
 	// compute array size
-	uint32 bytesCount = 0;
+	bytesPoints = 0;
+	bytesColorMap = 0;
+	bytesDepthMap = 0;
 	int index = 0;
 	for (const FLidarSensorOut& sensorOut : lidarSensorOuts) {
 		if (sensorOut.lidarPointsOut.Num() > 0) {
-			bytesCount += sensorOut.lidarPointsOut.Num() * 4 * 4;
+			bytesPoints += sensorOut.lidarPointsOut.Num() * 4 * 4;
 			bytesInfo += FString("Point") + FString::FromInt(index) + FString(":") + FString::FromInt(sensorOut.lidarPointsOut.Num()) + FString("//");
 		}
 		if (sensorOut.depthArrayOut.Num() > 0) {
-			bytesCount += sensorOut.depthArrayOut.Num() * 4;
+			bytesDepthMap += sensorOut.depthArrayOut.Num() * 4;
 			bytesInfo += FString("Depth") + FString::FromInt(index) + FString(":") + FString::FromInt(sensorOut.depthArrayOut.Num()) + FString("//");
 		}
 		if (sensorOut.colorArrayOut.Num() > 0) {
-			bytesCount += sensorOut.colorArrayOut.Num() * 4;
+			bytesColorMap += sensorOut.colorArrayOut.Num() * 4;
 			bytesInfo += FString("Color") + FString::FromInt(index) + FString(":") + FString::FromInt(sensorOut.colorArrayOut.Num()) + FString("//");
 		}
 		index++;
 	}
+	uint32 bytesCount = bytesPoints + bytesColorMap + bytesDepthMap;
 	GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, FString::FromInt(bytesCount));
 	TArray<uint8> bytes;
 	bytes.Init(0, bytesCount);
-	uint32 offset = 0;
+	uint32 offsetPoints = 0, offsetColorMap = 0, offsetDepthMap = 0;
 	for (const FLidarSensorOut& sensorOut : lidarSensorOuts) {
 		if (sensorOut.lidarPointsOut.Num() > 0) {
 			for (const FLidarPointCloudPoint& pp : sensorOut.lidarPointsOut) {
-				memcpy(&bytes[offset], &(pp.Location), 4 * 3);
-				offset += 12;
-				memcpy(&bytes[offset], &(pp.Color.DWColor()), 4);
-				offset += 4;
+				memcpy(&bytes[offsetPoints], &(pp.Location), 4 * 3);
+				offsetPoints += 12;
+				memcpy(&bytes[offsetPoints], &(pp.Color.DWColor()), 4);
+				offsetPoints += 4;
 			}
 		}
 		if (sensorOut.depthArrayOut.Num() > 0) {
-			memcpy(&bytes[offset], &sensorOut.depthArrayOut[0], sensorOut.depthArrayOut.Num() * 4);
-			offset += sensorOut.depthArrayOut.Num() * 4;
+			memcpy(&bytes[offsetDepthMap + bytesPoints], &sensorOut.depthArrayOut[0], sensorOut.depthArrayOut.Num() * 4);
+			offsetDepthMap += sensorOut.depthArrayOut.Num() * 4;
 		}
 		if (sensorOut.colorArrayOut.Num() > 0) {
-			memcpy(&bytes[offset], &sensorOut.colorArrayOut[0], sensorOut.colorArrayOut.Num() * 4);
-			offset += sensorOut.colorArrayOut.Num() * 4;
+			memcpy(&bytes[offsetColorMap + bytesPoints + bytesDepthMap], &sensorOut.colorArrayOut[0], sensorOut.colorArrayOut.Num() * 4);
+			offsetColorMap += sensorOut.colorArrayOut.Num() * 4;
 		}
 	}
 	//TArray<TArray<uint8>> bytePackets;
 	int numPackets = (int)ceil((float)bytesCount / (float)packetBytes);
 	bytePackets.Init(FBytes(), numPackets);
 	int remainingBytes = bytesCount;
-	offset = 0;
+	int offset = 0;
+	int packetIndex = 0;
 	for (FBytes& packet : bytePackets) {
-		int packetSize = std::min(packetBytes, remainingBytes);
+		int packetSize = std::min(packetBytes, remainingBytes) + 4;
 		packet.ArrayOut.Init(0, packetSize);
-		memcpy(&packet.ArrayOut[0], &bytes[offset], packetSize);
+		*(int*)&packet.ArrayOut[0] = packetIndex++;
+		memcpy(&packet.ArrayOut[4], &bytes[offset], packetSize);
 		
 		remainingBytes -= packetSize;
 		offset += packetSize;
 	}
+}
+
+void USensorSimulatorBPLibrary::IntToBytes(const int fromInt, TArray <uint8>& bytes)
+{
+	bytes.Init(0, 4);
+	*(int*)&bytes[0] = fromInt;
 }

@@ -71,6 +71,9 @@ class USensorSimulatorBPLibrary : public UBlueprintFunctionLibrary
 		const float vFovSDeg = -15.f, const float vFovEDeg = 15.f, const int lidarChannels = 32, const float hfovDeg = 90.f, const int lidarResolution = 100, const float lidarRange = 1000.f);
 
 	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "SensorOutToBytes", Keywords = "Sensor Out to Bytes Array"))
-	static void SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray <FBytes>& bytePackets, FString& bytesInfo, const int packetBytes = 10000);
+	static void SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray <FBytes>& bytePackets, FString& bytesInfo, int& bytesPoints, int& bytesColorMap, int& bytesDepthMap, const int packetBytes = 10000);
+
+	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "IntToBytes", Keywords = "Sensor Out to Bytes Array"))
+	static void IntToBytes(const int fromInt, TArray <uint8>& bytes);
 };
 
