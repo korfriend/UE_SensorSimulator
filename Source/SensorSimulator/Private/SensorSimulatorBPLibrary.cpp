@@ -229,7 +229,7 @@ void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& 
 		index++;
 	}
 	uint32 bytesCount = bytesPoints + bytesColorMap + bytesDepthMap;
-	GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, FString::FromInt(bytesCount));
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, FString::FromInt(bytesCount));
 	TArray<uint8> bytes;
 	bytes.Init(0, bytesCount);
 	uint32 offsetPoints = 0, offsetColorMap = 0, offsetDepthMap = 0;
