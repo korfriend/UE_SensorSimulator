@@ -229,7 +229,7 @@ void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& 
 		index++;
 	}
 	uint32 bytesCount = bytesPoints + bytesColorMap + bytesDepthMap;
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::FromInt(bytesCount));
+	GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, FString::FromInt(bytesCount));
 	TArray<uint8> bytes;
 	bytes.Init(0, bytesCount);
 	uint32 offsetPoints = 0, offsetColorMap = 0, offsetDepthMap = 0;
@@ -259,14 +259,17 @@ void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& 
 	int packetIndex = 0;
 	for (FBytes& packet : bytePackets) {
 		int packetSize = std::min(packetBytes, remainingBytes);
-		packet.ArrayOut.Init(0, packetSize);
+		packet.ArrayOut.Init(0, packetSize + 4);
 		*(int*)&packet.ArrayOut[0] = packetIndex++;
 		memcpy(&packet.ArrayOut[4], &bytes[offset], packetSize);
 		
 		remainingBytes -= packetSize;
 		offset += packetSize;
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::FromInt(packetSize));
 	}
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::FromInt(remainingBytes));
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::FromInt(packetBytes));
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Yellow, FString::FromInt(remainingBytes));
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Green, FString::FromInt(offset));
 }
 
 void USensorSimulatorBPLibrary::IntToBytes(const int fromInt, TArray <uint8>& bytes)
