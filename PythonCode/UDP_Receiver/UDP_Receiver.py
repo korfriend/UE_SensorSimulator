@@ -38,20 +38,19 @@ class SurroundView(ShowBase):
         self.axis.reparentTo(base.render)
         
         #쉐이더 설정 
-        #my_shader = Shader.load(Shader.SL_GLSL,
-        #                        vertex="shaders/texturing-vert.glsl",
-        #                        fragment="shaders/texturing-frag.glsl")
+        my_shader = Shader.load(Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps.glsl")
         vertex_format = p3d.GeomVertexFormat.getV3t2()
         vdata = p3d.GeomVertexData('triangle_data', vertex_format, p3d.Geom.UHStatic)
-        vdata.setNumRows(2)
+        vdata.setNumRows(4) # optional for performance enhancement!
         vertex = p3d.GeomVertexWriter(vdata, 'vertex')
         texcoord = p3d.GeomVertexWriter(vdata, 'texcoord')
 
         waterZ = bbox[0].z + (bbox[1].z - bbox[0].z) * 0.2
-        vertex.addData3(-10, 10, waterZ)
-        vertex.addData3(10, 10, waterZ)
-        vertex.addData3(10, -10, waterZ)
-        vertex.addData3(-10, -10, waterZ)
+        waterPlaneLength = 20
+        vertex.addData3(-waterPlaneLength, waterPlaneLength, waterZ)
+        vertex.addData3(waterPlaneLength, waterPlaneLength, waterZ)
+        vertex.addData3(waterPlaneLength, -waterPlaneLength, waterZ)
+        vertex.addData3(-waterPlaneLength, -waterPlaneLength, waterZ)
         texcoord.addData2(0, 0)
         texcoord.addData2(1, 0)
         texcoord.addData2(1, 1)
@@ -67,10 +66,10 @@ class SurroundView(ShowBase):
         geomNode.addGeom(geom)
         self.plane = p3d.NodePath(geomNode) # note nodePath is the instance for node (obj resource)
         self.plane.setTwoSided(True)
+        self.plane.setShader(my_shader)
         self.plane.reparentTo(self.render)
 
 mySvm = SurroundView()
-mySvm.run()
 
 ####################### UDP Thread
 
@@ -163,6 +162,19 @@ def ReceiveData():
             cv.imshow('image_deirvlon 3', imgs[3])
             cv.waitKey(1)
         
+            # https://docs.panda3d.org/1.10/python/programming/texturing/simple-texturing
+            # https://docs.panda3d.org/1.10/cpp/programming/advanced-loading/loading-resources-from-memory
+            pnm = p3d.PNMImage()
+            i = 0
+            imgData = fullPackets[offsetColor + imgBytes *
+                                  i: offsetColor + imgBytes * (i + 1)]
+            imgnp = np.array(
+                fullPackets[offsetColor + imgBytes * i: offsetColor + imgBytes * (i + 1)], dtype=np.uint8)
+            #imgs.append(imgnp.reshape((256, 256, 4)))
+            pnm.read(p3d.StringStream(imgnp.reshape((256, 256, 4))))
+            tex = p3d.Texture()
+            tex.load(pnm)
+            mySvm.plane.setShaderInput('myTexture0', tex)
         
 
     #print(("Packets : {p0}, {p1}, {p2}, {p3}").format(p0=packet[0], p1=packet[1], p2=packet[2], p3=packet[3]))
@@ -173,3 +185,6 @@ def ReceiveData():
 
 t = threading.Thread(target=ReceiveData, args=())
 t.start()
+
+print("\n\nSVM Start!")
+mySvm.run()
