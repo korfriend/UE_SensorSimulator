@@ -215,7 +215,7 @@ void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& 
 	int index = 0;
 	for (const FLidarSensorOut& sensorOut : lidarSensorOuts) {
 		if (sensorOut.lidarPointsOut.Num() > 0) {
-			bytesPoints += sensorOut.lidarPointsOut.Num() * 4 * 4;
+			bytesPoints += sensorOut.lidarPointsOut.Num() * 4 * 4 + 4;
 			bytesInfo += FString("Point") + FString::FromInt(index) + FString(":") + FString::FromInt(sensorOut.lidarPointsOut.Num()) + FString("//");
 		}
 		if (sensorOut.depthArrayOut.Num() > 0) {
@@ -235,6 +235,8 @@ void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& 
 	uint32 offsetPoints = 0, offsetColorMap = 0, offsetDepthMap = 0;
 	for (const FLidarSensorOut& sensorOut : lidarSensorOuts) {
 		if (sensorOut.lidarPointsOut.Num() > 0) {
+			*(int*)&bytes[offsetPoints] = sensorOut.lidarPointsOut.Num();
+			offsetPoints += 4;
 			for (const FLidarPointCloudPoint& pp : sensorOut.lidarPointsOut) {
 				memcpy(&bytes[offsetPoints], &(pp.Location), 4 * 3);
 				offsetPoints += 12;

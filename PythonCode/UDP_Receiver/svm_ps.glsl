@@ -9,6 +9,9 @@ in vec3 worldcoord;
 
 uniform sampler2D p3d_Texture0;
 uniform sampler2D myTexture0;
+uniform sampler2D myTexture1;
+uniform sampler2D myTexture2;
+uniform sampler2D myTexture3;
 
 void main() {
 
