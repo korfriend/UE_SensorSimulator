@@ -5,7 +5,6 @@ import struct
 import numpy as np
 import cv2 as cv
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import loadPrcFileData
 from panda3d.core import Shader
 import panda3d.core as p3d
 import panda3d
@@ -20,7 +19,7 @@ class SurroundView(ShowBase):
         # https://docs.panda3d.org/1.10/python/programming/render-attributes/antialiasing
         self.render.setAntialias(p3d.AntialiasAttrib.MAuto)
         # 카메라 위치 조정 
-        self.cam.setPos(0, 0, 80)
+        self.cam.setPos(0, 0, 8000)
         self.cam.lookAt(p3d.LPoint3f(0, 0, 0), p3d.LVector3f(0, 1, 0))
         #self.trackball.node().setMat(self.cam.getMat())
         #self.trackball.node().reset()
@@ -28,6 +27,7 @@ class SurroundView(ShowBase):
         
         #보트 로드
         self.boat = self.loader.loadModel("avikus_boat.glb")
+        self.boat.setScale(p3d.Vec3(100, 100, 100))
         bbox = self.boat.getTightBounds()
         print(bbox)
         center = (bbox[0] + bbox[1]) * 0.5
@@ -36,7 +36,7 @@ class SurroundView(ShowBase):
         
         self.axis = self.loader.loadModel('zup-axis')
         self.axis.setPos(0, 0, 0)
-        #self.axis.setScale(.001)
+        self.axis.setScale(100)
         self.axis.reparentTo(base.render)
         
         self.isPointCloudSetup = False
@@ -56,7 +56,7 @@ class SurroundView(ShowBase):
             bbox = svmBase.boat.getTightBounds()
             print(bbox)
             waterZ = bbox[0].z + (bbox[1].z - bbox[0].z) * 0.2
-            waterPlaneLength = 20
+            waterPlaneLength = 2500
             vertex.addData3(-waterPlaneLength, waterPlaneLength, waterZ)
             vertex.addData3(waterPlaneLength, waterPlaneLength, waterZ)
             vertex.addData3(waterPlaneLength, -waterPlaneLength, waterZ)
@@ -241,6 +241,51 @@ def ReceiveData():
                 mySvm.numLidars = numLidars
                 mySvm.taskMgr.add(GeneratePointNode, "GeneratePointNode")
                 
+                # Create a 4x4 matrix
+                fov = 90.0
+                aspectRatio = 1.0
+                lens = p3d.PerspectiveLens()
+                lens.set_fov(fov)
+                lens.set_aspect_ratio(aspectRatio)
+                lens.set_near(1.0)
+                lens.set_far(10000.0)
+                projMat = lens.get_projection_mat()
+
+                sensor_pos_array = [
+                    p3d.Vec3(30, 0, 40), 
+                    p3d.Vec3(0, 60, 40), 
+                    p3d.Vec3(-40, 0, 40), 
+                    p3d.Vec3(0, -80, 40)
+                    ]
+                sensor_rot_z_array = [0, 90, 180, -90]
+                cam_pos = p3d.Vec3(0, 0, 50)
+                cam_rot_y = -10
+
+                def computeLookAt(camera_pos, camera_target, camera_up) : 
+                    forward = camera_target - camera_pos
+                    forward.normalize()
+                    right = p3d.LVector3f.cross(camera_up, forward)
+                    right.normalize()
+                    up = p3d.LVector3f.cross(forward, right)
+                    return p3d.LMatrix4f(right[0], up[0], forward[0], 0.0,
+                        right[1], up[1], forward[1], 0.0,
+                        right[2], up[2], forward[2], 0.0,
+                        -p3d.LVector3f.dot(right, camera_pos),
+                        -p3d.LVector3f.dot(up, camera_pos),
+                        -p3d.LVector3f.dot(forward, camera_pos), 1.0)
+
+                localCamMat = computeLookAt(p3d.Vec3(0, 0, 0), p3d.Vec3(1, 0, 0), p3d.Vec3(0, 0, 1))
+                camMat = p3d.Mat4.translateMat(cam_pos) * p3d.Mat4.rotateMat(cam_rot_y, p3d.Vec3(0, -1, 0)) * localCamMat
+                camMat_array = [p3d.Mat4(localCamMat), p3d.Mat4(localCamMat), p3d.Mat4(localCamMat), p3d.Mat4(localCamMat)]
+                sensorMat_array = [p3d.Mat4(), p3d.Mat4(), p3d.Mat4(), p3d.Mat4()]
+                imgIdx = 0
+                for camMat, sensorMat, deg, pos in zip(camMat_array, sensorMat_array, sensor_rot_z_array, sensor_pos_array):
+                    sensorMat = p3d.Mat4.translateMat(pos.x, -pos.y, pos.z) * p3d.Mat4.rotateMat(deg, p3d.Vec3(0, 0, 1))
+                    sensorMat_array[imgIdx] = sensorMat
+                    camMat = sensorMat * camMat
+                    mySvm.plane.setShaderInput("world2image" + str(imgIdx), projMat * camMat)
+                    imgIdx += 1
+
                 #mySvm.planePnm = p3d.PNMImage()
                 mySvm.planeTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
                 for i in range(4):
@@ -249,6 +294,7 @@ def ReceiveData():
                     mySvm.plane.setShaderInput(
                         'myTexture' + str(i), mySvm.planeTexs[i])
                 
+                mySvm.sensorMat_array = sensorMat_array
                 print("Texture Initialized!")
                 
             if mySvm.isPointCloudSetup == True:
@@ -264,12 +310,13 @@ def ReceiveData():
                     numSingleLidarPoints = int.from_bytes(fullPackets[offsetPoints: 4 + offsetPoints], "little")
                     #print(("Num Process Points : {Num}").format(Num=numSingleLidarPoints))
 
+                    matSensor = mySvm.sensorMat_array[i] 
                     offsetPoints += 4
                     numProcessPoints += numSingleLidarPoints
                     for j in range(numSingleLidarPoints):
-                        pX = struct.unpack('<f', fullPackets[0 + offsetPoints : 4 + offsetPoints])[0] * 0.05
-                        pY = struct.unpack('<f', fullPackets[4 + offsetPoints : 8 + offsetPoints])[0] * 0.05
-                        pZ = struct.unpack('<f', fullPackets[8 + offsetPoints: 12 + offsetPoints])[0] * 0.05
+                        pX = struct.unpack('<f', fullPackets[0 + offsetPoints : 4 + offsetPoints])[0]
+                        pY = struct.unpack('<f', fullPackets[4 + offsetPoints : 8 + offsetPoints])[0]
+                        pZ = struct.unpack('<f', fullPackets[8 + offsetPoints: 12 + offsetPoints])[0]
                         #cR = np.frombuffer(fullPackets[12 + offsetPoints, 13 + offsetPoints], dtype=np.int8)[0]
                         cR = int.from_bytes(fullPackets[12 + offsetPoints : 13 + offsetPoints], "little")
                         cG = int.from_bytes(fullPackets[13 + offsetPoints : 14 + offsetPoints], "little")
@@ -281,8 +328,23 @@ def ReceiveData():
                         offsetPoints += 16
                         posPoint = p3d.LPoint3f(pX, pY, pZ)
                         # to do : transform posPoint (local) to world
-                        mySvm.pointsVertex.setData3f(posPoint)
-                        mySvm.pointsColor.setData4f(cB / 255.0, cG / 255.0, cR / 255.0, cA / 255.0)
+                        posPointWS = matSensor.xformPoint(posPoint)
+                        posPointWS.y *= -1
+                        #if j == 0 : 
+                        #    print(matSensor)
+                        mySvm.pointsVertex.setData3f(posPointWS)
+                        #mySvm.pointsColor.setData4f(cB / 255.0, cG / 255.0, cR / 255.0, cA / 255.0)
+                        if i == 0:
+                            mySvm.pointsColor.setData4f(0, 0, 1, 1)
+                        elif i == 1:
+                            mySvm.pointsColor.setData4f(0, 1, 0, 1)
+                        elif i == 2:
+                            mySvm.pointsColor.setData4f(1, 0, 0, 1)
+                        elif i == 3:
+                            mySvm.pointsColor.setData4f(0, 1, 1, 1)
+
+
+
                         #mySvm.pointsColor.setData4f(1.0, 0, 0, 1.0)
                     #print(("Num Process Points : {Num}").format(Num=numProcessPoints))
 
