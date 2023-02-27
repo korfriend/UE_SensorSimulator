@@ -205,6 +205,21 @@ void USensorSimulatorBPLibrary::LidarSensorAsyncScan4(
 	}
 }
 
+void USensorSimulatorBPLibrary::ReadSemantic(USceneCaptureComponent2D* sceneCapture, TArray<FColor>& semanticArrayOut) {
+	UTextureRenderTarget2D* textureRT = sceneCapture->TextureTarget;
+	float texWidth = (float)textureRT->SizeX;
+	float texHeight = (float)textureRT->SizeY;
+
+	auto RenderTargetResource = textureRT->GameThread_GetRenderTargetResource();
+
+	TArray<FColor> buffer;
+	semanticArrayOut.Init(FColor(), texWidth * texHeight);
+	if (RenderTargetResource) {
+		RenderTargetResource->ReadPixels(buffer);
+
+		semanticArrayOut = buffer;
+	}
+}
 
 void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray<FBytes>& bytePackets, FString& bytesInfo, int& bytesPoints, int& bytesColorMap, int& bytesDepthMap, const int packetBytes)
 {
