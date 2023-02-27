@@ -172,6 +172,26 @@ print("UDP server up and listening")
 
 mySvm.isInitializedUDP = True
 
+color_map = [(128, 64,128),
+             (244, 35,232),
+             ( 70, 70, 70),
+             (102,102,156),
+             (190,153,153),
+             (153,153,153),
+             (250,170, 30),
+             (220,220,  0),
+             (107,142, 35),
+             (152,251,152),
+             ( 70,130,180),
+             (220, 20, 60),
+             (255,  0,  0),
+             (  0,  0,142),
+             (  0,  0, 70),
+             (  0, 60,100),
+             (  0, 80,100),
+             (  0,  0,230),
+             (119, 11, 32)]
+
 def ReceiveData():
     # Listen for incoming datagrams
     while(True):
@@ -294,6 +314,13 @@ def ReceiveData():
                     mySvm.plane.setShaderInput(
                         'myTexture' + str(i), mySvm.planeTexs[i])
                 
+                mySvm.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
+                for i in range(4):
+                    mySvm.semanticTexs[i].setup2dTexture(
+                        imageWidth, imageHeight, p3d.Texture.T_unsigned_byte, p3d.Texture.F_red)
+                    mySvm.plane.setShaderInput(
+                        'semanticTex' + str(i), mySvm.semanticTexs[i])
+
                 mySvm.sensorMat_array = sensorMat_array
                 print("Texture Initialized!")
                 
@@ -368,7 +395,8 @@ def ReceiveData():
             offsetColor = bytesPoints + bytesDepthmap
             imgBytes = imageWidth * imageHeight * 4
             imgs = []
-            for i in range(4):
+            semantics = []
+            for i in range(8):
                 #print(("AAA-1 {aa}, {bb}, {cc}").format(aa=imgBytes, bb=offsetColor, cc=i))
                 imgnp = np.array(
                     fullPackets[offsetColor + imgBytes * i: offsetColor + imgBytes * (i + 1)], dtype=np.uint8)
@@ -377,18 +405,31 @@ def ReceiveData():
                 img = imgnp.reshape((imageWidth, imageHeight, 4))
 
                 #print("AAA-3")
-                imgs.append(img)
-                #print("AAA-4")
-                # https://docs.panda3d.org/1.10/python/programming/texturing/simple-texturing
-                # https://docs.panda3d.org/1.10/cpp/programming/advanced-loading/loading-resources-from-memory
-                mySvm.planeTexs[i].setRamImage(img)
-                #print(("Plane Texture : {Num}").format(Num=i))
+                if i % 2 == 0:  # imgs
+                    imgs.append(img)
+                    #print("AAA-4")
+                    # https://docs.panda3d.org/1.10/python/programming/texturing/simple-texturing
+                    # https://docs.panda3d.org/1.10/cpp/programming/advanced-loading/loading-resources-from-memory
+                    mySvm.planeTexs[int(i / 2)].setRamImage(img)
+                    #print(("Plane Texture : {Num}").format(Num=i))
+                else:  # semantics
+                    semantic = np.zeros_like(img).astype(np.uint8)
+                    img = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
+                    for j, color in enumerate(color_map):
+                        for k in range(3):
+                            semantic[:, :, k][img[:, :] == j] = color[k]
+                    semantics.append(semantic)
+                    mySvm.semanticTexs[int(i / 2)].setRamImage(img)
 
 
             cv.imshow('image_deirvlon 0', imgs[0])
             cv.imshow('image_deirvlon 1', imgs[1])
             cv.imshow('image_deirvlon 2', imgs[2])
             cv.imshow('image_deirvlon 3', imgs[3])
+            cv.imshow("semantic_deirvlon 0", semantics[0])
+            cv.imshow("semantic_deirvlon 1", semantics[1])
+            cv.imshow("semantic_deirvlon 2", semantics[2])
+            cv.imshow("semantic_deirvlon 3", semantics[3])
             cv.waitKey(1)
             
 
