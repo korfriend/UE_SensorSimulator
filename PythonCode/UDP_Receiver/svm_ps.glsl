@@ -12,15 +12,45 @@ uniform mat4 world2image1;
 uniform mat4 world2image2;
 uniform mat4 world2image3;
 
+uniform mat4 matTest0;
+uniform mat4 matTest1;
+
 uniform sampler2D myTexture0;
 uniform sampler2D myTexture1;
 uniform sampler2D myTexture2;
 uniform sampler2D myTexture3;
 
 void main() {
-    vec4 imagePos = world2image * vec4(worldcoord, 1.0);
-    imagePos.xyz /= imagePos.w;
-    vec2 texPos = (imagePos.xy + vec2(1.0, 1.0)) * 0.5;
+    //mat4 w2iT = transpose(matTest1); 
+    //mat4 view = (matTest0);
+    //mat4 vp = world2image0;
+    vec3 pos = worldcoord;
+    //pos.z = -500;
+    vec4 imagePos = world2image0 * vec4(pos, 1.0);
+    vec3 imagePos3 = imagePos.xyz / imagePos.w;
+    //vec4 imagePosV = matTest0 * vec4(pos, 1.0);
+    //vec3 imagePosV3 = imagePosV.xyz / imagePosV.w;
+    vec2 texPos = (imagePos3.xy + vec2(1.0, 1.0)) * 0.5;
+    vec4 colorOut = vec4(0); 
+    if(imagePos3.z < 0)
+        colorOut = vec4(0.01f, 0.0f, 0.0f, 1.0f);
+    else if(imagePos3.z > 1)
+        colorOut = vec4(0.5, 0, 1, 1);
+    else if(texPos.x < 0)
+        colorOut = vec4(1, 0, 0, 1);
+    else if(texPos.y < 0)
+        colorOut = vec4(0, 1, 0, 1);
+    else if(texPos.x > 1)
+        colorOut = vec4(0, 0, 1, 1);
+    else if(texPos.y > 1)
+        colorOut = vec4(1, 1, 0, 1);
+    else {
+        //colorOut = texture(myTexture0, texPos);//vec4(texPos, 0, 1);
+        colorOut = texture(myTexture0, vec2(1 - texPos.x, 1 - texPos.y));//vec4(texPos, 0, 1);
+        //colorOut = vec4(texPos.x, 1 - texPos.y, 0, 1);
+    }
+    /**/
+    p3d_FragColor = colorOut;
     /*
     sampler2D texs[4] = {myTexture0, myTexture1, myTexture2, myTexture3}
     vec4 colors[4];
@@ -47,8 +77,8 @@ void main() {
 
 
 
-    vec4 color = texture(myTexture0, texPos);
-    p3d_FragColor = color.rgba;
+    //vec4 color = texture(myTexture0, texPos);
+    //p3d_FragColor = vec4(texPos.xy, 1, 1); color.rgba;
     //p3d_FragColor = texture(p3d_Texture0, texcoord);
     //p3d_FragColor = vec4(texcoord.x, texcoord.y, 0.0, 1.0);
     //p3d_FragColor = vec4(1, 0, 0.0, 1.0);
