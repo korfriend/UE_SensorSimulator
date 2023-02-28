@@ -8,6 +8,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/TextureRenderTarget2D.h"
 
+#include "Serialization/MemoryWriter.h"
+
 #include <map>
 
 //#include "opencv2/core.hpp"
@@ -221,7 +223,9 @@ void USensorSimulatorBPLibrary::ReadSemantic(USceneCaptureComponent2D* sceneCapt
 	}
 }
 
-void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts, TArray<FBytes>& bytePackets, FString& bytesInfo, int& bytesPoints, int& bytesColorMap, int& bytesDepthMap, const int packetBytes)
+void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& lidarSensorOuts,
+	TArray<FBytes>& bytePackets, FString& bytesInfo, int& bytesPoints, int& bytesColorMap,
+	int& bytesDepthMap, const int packetBytes)
 {
 	// compute array size
 	bytesPoints = 0;
@@ -294,3 +298,55 @@ void USensorSimulatorBPLibrary::IntToBytes(const int fromInt, TArray <uint8>& by
 	bytes.Init(0, 4);
 	*(int*)&bytes[0] = fromInt;
 }
+
+void USensorSimulatorBPLibrary::GetViewProTectionMatrix(const TArray<USceneCaptureComponent2D*> sceneCapture,
+	TArray<FMatrix>& viewprojectionMatrix, TArray<FMatrix>& projectionMatrix, TArray<FMatrix>& viewMatrix)
+{
+	for (int i = 0; i < sceneCapture.Num(); i++) {
+		USceneCaptureComponent2D* sceneCapture2 = sceneCapture[i];
+		FMinimalViewInfo viewInfo;
+		sceneCapture2->GetCameraView(0, viewInfo);
+		UTextureRenderTarget2D* textureRT = sceneCapture2->TextureTarget;
+		float texWidth = (float)textureRT->SizeX;
+		float texHeight = (float)textureRT->SizeY;
+		UGameplayStatics::GetViewProjectionMatrix(viewInfo, viewMatrix[i], projectionMatrix[i], viewprojectionMatrix[i]);
+	}
+}
+
+void USensorSimulatorBPLibrary::PosAndRotToBytes(const FVector position ,const FRotator rotation, TArray<uint8>& bytePackets)
+{
+	bytePackets.Init(0,sizeof(FVector) + sizeof(FRotator));
+
+	uint8* DataPtr = bytePackets.GetData();
+	FMemory::Memcpy(DataPtr, &position, sizeof(FVector));
+	DataPtr += sizeof(FVector);
+	FMemory::Memcpy(DataPtr,&rotation, sizeof(FRotator));
+	//FMemory::Memcpy(DataPtr, reinterpret_cast<const uint8*>(&position), sizeof(FVector));
+	//FMemory::Memcpy(DataPtr, reinterpret_cast<const uint8*>(&rotation), sizeof(FRotator));
+}
+
+void USensorSimulatorBPLibrary::CamInfoToBytes(const TArray<FMatrix>& camMat, const int fov, const float aspectRatio, TArray<uint8>& bytePackets)
+{
+	for (const FMatrix& Matrix : camMat)
+	{
+		// Convert FMatrix to bytes
+		const double* MatrixPtr = Matrix.M[0];
+		for (int32 i = 0; i < 16; ++i)
+		{
+			bytePackets.Add(reinterpret_cast<const uint8*>(MatrixPtr)[i]);
+		}
+	}
+	bytePackets.Append(reinterpret_cast<const uint8*>(&aspectRatio), sizeof(float));
+	bytePackets.Append(reinterpret_cast<const uint8*>(&fov), sizeof(int));
+}
+
+//for test PosAndRotToBytes
+//void USensorSimulatorBPLibrary::ConvertBytesToVectorAndRotator(const TArray<uint8>& InBytes, FVector& OutVector, FRotator& OutRotator)
+//{
+//	check(InBytes.Num() == sizeof(FVector) + sizeof(FRotator));
+//
+//	uint8* DataPtr = const_cast<uint8*>(InBytes.GetData());
+//	FMemory::Memcpy(&OutVector, DataPtr, sizeof(FVector));
+//	DataPtr += sizeof(FVector);
+//	FMemory::Memcpy(&OutRotator, DataPtr, sizeof(FRotator));
+//}
