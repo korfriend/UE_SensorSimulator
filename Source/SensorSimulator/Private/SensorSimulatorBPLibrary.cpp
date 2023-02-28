@@ -341,12 +341,12 @@ void USensorSimulatorBPLibrary::CamInfoToBytes(const TArray<FMatrix>& camMat, co
 }
 
 //for test PosAndRotToBytes
-//void USensorSimulatorBPLibrary::ConvertBytesToVectorAndRotator(const TArray<uint8>& InBytes, FVector& OutVector, FRotator& OutRotator)
-//{
-//	check(InBytes.Num() == sizeof(FVector) + sizeof(FRotator));
-//
-//	uint8* DataPtr = const_cast<uint8*>(InBytes.GetData());
-//	FMemory::Memcpy(&OutVector, DataPtr, sizeof(FVector));
-//	DataPtr += sizeof(FVector);
-//	FMemory::Memcpy(&OutRotator, DataPtr, sizeof(FRotator));
-//}
+void USensorSimulatorBPLibrary::ConvertBytesToVectorAndRotator(const TArray<uint8>& InBytes, FVector& OutVector, FRotator& OutRotator)
+{
+	check(InBytes.Num() == sizeof(FVector) + sizeof(FRotator));
+
+	uint8* DataPtr = const_cast<uint8*>(InBytes.GetData());
+	FMemory::Memcpy(&OutVector, DataPtr, sizeof(FVector));
+	DataPtr += sizeof(FVector);
+	FMemory::Memcpy(&OutRotator, DataPtr, sizeof(FRotator));
+}
