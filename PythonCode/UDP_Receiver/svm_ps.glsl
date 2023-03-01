@@ -53,6 +53,7 @@ void main() {
         if (imagePos3.z >= 0.0 && imagePos3.z <= 1.0
             && texPos.x >= 0.0 && texPos.x <= 1.0
             && texPos.y >= 0.0 && texPos.y <= 1.0) {
+            // https://stackoverflow.com/questions/72648980/opengl-sampler2d-array
             colorOut = texture(cameraImgs, vec3(1 - texPos.x, 1 - texPos.y, i));
         }
     }

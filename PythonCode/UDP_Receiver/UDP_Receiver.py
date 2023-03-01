@@ -91,6 +91,7 @@ class SurroundView(ShowBase):
             #    svmBase.plane.setShaderInput('myTexture' + str(i), svmBase.planeTexs[i])
 
             svmBase.planeTexArray = p3d.Texture()
+            svmBase.planeTexArray.setup2dTextureArray(256, 256, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
             svmBase.plane.setShaderInput('cameraImgs', svmBase.planeTexArray)
             svmBase.plane.setShaderInput("matTest0", p3d.Mat4())
             svmBase.plane.setShaderInput("matTest1", p3d.Mat4())
@@ -349,25 +350,27 @@ def ReceiveData():
                     camMat = localCamMat * sensorMat
                     camMat3 = camMat.getUpper3()  # or, use xformVec instead
                     
-                    nodePath = p3d.NodePath()
+                    # think... LHS to RHS...
+                    # also points...
+                    
                     camPos = camMat.xformPoint(p3d.Vec3(0, 0, 0))
-                    #nodePath.setPos(camPos)
-                    #nodePath.lookAt(camPos + camMat3.xform(p3d.Vec3(1, 0, 0)), camMat3.xform(p3d.Vec3(0, 0, 1)))
-                    #viewMat = nodePath.getMat()
-                    viewMat = computeLookAt(camPos, 
-                                            camPos + camMat.xformVec(p3d.Vec3(1, 0, 0)), 
-                                            camMat.xformVec(p3d.Vec3(0, 0, 1)))
+                    view = camMat.xformVec(p3d.Vec3(1, 0, 0))
+                    view.y *= -1
+                    up = camMat.xformVec(p3d.Vec3(0, 0, 1))
+                    up.y *= -1
+                    viewMat = computeLookAt(camPos, camPos + view, up)
 
                     #viewProjMat = p3d.LMatrix4f()
                     #viewProjMat = viewMat * projMat
                     viewProjMat = viewMat * projMat
                     
                     matViewProjs[imgIdx] = viewProjMat
-                    #if imgIdx == 0:
-                        #print(("camPos1 {}").format(camMat.xformPoint(p3d.Vec3(0, 0, 0))))
-                        #print(("camPos2 {}").format(camMat.xform(p3d.Vec4(0, 0, 0, 1))))
-                        #print(("camDir {}").format(camMat3.xform(p3d.Vec3(1, 0, 0)))) 
-                        #print(("camUp  {}").format(camMat3.xform(p3d.Vec3(0, 0, 1))))
+                    if imgIdx == 1:
+                        print(("camPos1 {}").format(camMat.xformPoint(p3d.Vec3(0, 0, 0))))
+                        print(("camPos2 {}").format(pos))
+                        print(("camDir {}").format(camMat3.xform(p3d.Vec3(1, 0, 0)))) 
+                        print(("camUp  {}").format(camMat3.xform(p3d.Vec3(0, 0, 1))))
+                        print("############")
                         #print(("test pos1  {}").format(viewMat.xformPoint(p3d.Vec3(1000, 0, 0)))) 
                         #print(("test pos2  {}").format(viewProjMat.xform(p3d.Vec4(1000, 0, 0, 1))))
                         #print(("test pos3  {}").format(viewProjMat.xform(p3d.Vec4(30.15, 0, 0, 1))))
