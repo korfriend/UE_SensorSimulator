@@ -78,5 +78,18 @@ class USensorSimulatorBPLibrary : public UBlueprintFunctionLibrary
 
 	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "IntToBytes", Keywords = "Sensor Out to Bytes Array"))
 	static void IntToBytes(const int fromInt, TArray <uint8>& bytes);
+
+
+
+	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "GetViewProTectionMatrix", Keywords = "GetViewProTectionMatrix"))
+		static void GetViewProTectionMatrix(const TArray<USceneCaptureComponent2D*> sceneCapture,
+			TArray<FMatrix>& viewprojectionMatrix, TArray<FMatrix>& projectionMatrix, TArray<FMatrix>& viewMatrix);
+	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "PosAndRotToBytes", Keywords = "camera Position AndRotation ToBytes"))
+		static void PosAndRotToBytes(const FVector position, const FRotator rotation, TArray<uint8>& bytePackets);
+	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "ConvertBytesToVectorAndRotator", Keywords = "for test PosAndRotToBytes "))
+		static void ConvertBytesToVectorAndRotator(const TArray<uint8>& InBytes, FVector& OutVector, FRotator& OutRotator);
+	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "CamInfoToBytes", Keywords = "Cam Matrix Array ,fov, aspect ratio  to Bytes Array"))
+		static void	CamInfoToBytes(const TArray<FMatrix>& camMat, const int fov, const float aspectRatio, TArray<uint8>& bytePackets);
+
 };
 
