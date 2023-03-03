@@ -391,6 +391,11 @@ def ReceiveData():
 
                 mySvm.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
                 mySvm.plane.setShaderInput('cameraImgs', mySvm.planeTexArray)
+                
+                if bytesRGBmap > imageWidth * imageHeight * 4 * numLidars:
+                    # use this branch logic to add custom data in this scene
+                    print("Custom case for Semantic images")
+                    
                 #for i in range(4):
                 #    mySvm.semanticTexs[i].setup2dTexture(
                 #        imageWidth, imageHeight, p3d.Texture.T_unsigned_byte, p3d.Texture.F_red)
@@ -473,6 +478,9 @@ def ReceiveData():
             imgBytes = imageWidth * imageHeight * 4
             imgs = []
             semantics = []
+            # use this branch logic to add custom data in this scene
+            isCustomImgs = bytesRGBmap > imageWidth * imageHeight * 4 * numLidars
+            
             for i in range(4):
                 #print(("AAA-1 {aa}, {bb}, {cc}").format(aa=imgBytes, bb=offsetColor, cc=i))
                 imgnp = np.array(
@@ -480,29 +488,34 @@ def ReceiveData():
 
                 #print("AAA-2")
                 img = imgnp.reshape((imageWidth, imageHeight, 4))
-
+                
                 #print("AAA-3")
-                if i % 1 == 0:  # imgs
-                    imgs.append(img)
-                    #print("AAA-4")
+                if ~isCustomImgs:
                     # https://docs.panda3d.org/1.10/python/programming/texturing/simple-texturing
                     # https://docs.panda3d.org/1.10/cpp/programming/advanced-loading/loading-resources-from-memory
-                    #mySvm.planeTexs[int(i / 2)].setRamImage(img)
+                    imgs.append(img)
+                else :
+                    if i % 2 == 0:  # imgs
+                        imgs.append(img)
+                        #print("AAA-4")
+                        #mySvm.planeTexs[int(i / 2)].setRamImage(img)
 
-                    #mySvm.planeTexs[i].setRamImage(img)
-                    #mySvm.planeTexs[i].setup2dTexture(
-                    #imageWidth, imageHeight, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
-                    #mySvm.plane.setShaderInput(
-                    #    'myTexture' + str(i), mySvm.planeTexs[i])
-                    #print(("Plane Texture : {Num}").format(Num=i))
-                else:  # semantics
-                    semantic = np.zeros_like(img).astype(np.uint8)
-                    img = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
-                    for j, color in enumerate(color_map):
-                        for k in range(3):
-                            semantic[:, :, k][img[:, :] == j] = color[k]
-                    semantics.append(semantic)
-                    mySvm.semanticTexs[int(i / 2)].setRamImage(img)
+                        #mySvm.planeTexs[i].setRamImage(img)
+                        #mySvm.planeTexs[i].setup2dTexture(
+                        #imageWidth, imageHeight, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
+                        #mySvm.plane.setShaderInput(
+                        #    'myTexture' + str(i), mySvm.planeTexs[i])
+                        #print(("Plane Texture : {Num}").format(Num=i))
+                    else:  # semantics
+                        semantic = np.zeros_like(img).astype(np.uint8)
+                        img = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
+                        for j, color in enumerate(color_map):
+                            for k in range(3):
+                                semantic[:, :, k][img[:, :] == j] = color[k]
+                        semantics.append(semantic)
+                        # use sampler2DArray in glsl rather than sampler2D
+                        # refer to 'sampler2DArray cameraImgs' and 'mySvm.planeTexArray.setRamImage(imgArray)'
+                        mySvm.semanticTexs[int(i / 2)].setRamImage(img)
 
             imgnpArray = np.array(
                 fullPackets[offsetColor + imgBytes * 0: offsetColor + imgBytes * (3 + 1)], dtype=np.uint8)
