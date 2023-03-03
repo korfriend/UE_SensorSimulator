@@ -20,7 +20,7 @@ class SurroundView(ShowBase):
         # https://docs.panda3d.org/1.10/python/programming/render-attributes/antialiasing
         self.render.setAntialias(p3d.AntialiasAttrib.MAuto)
         # 카메라 위치 조정 
-        self.cam.setPos(0, 0, 8000)
+        self.cam.setPos(0, 0, 5000)
         self.cam.lookAt(p3d.LPoint3f(0, 0, 0), p3d.LVector3f(0, 1, 0))
         #self.trackball.node().setMat(self.cam.getMat())
         #self.trackball.node().reset()
@@ -56,12 +56,12 @@ class SurroundView(ShowBase):
 
             bbox = svmBase.boat.getTightBounds()
             print(bbox)
-            waterZ = bbox[0].z + (bbox[1].z - bbox[0].z) * 0.2
+            self.waterZ = bbox[0].z + (bbox[1].z - bbox[0].z) * 0.2
             waterPlaneLength = 2500
-            vertex.addData3(-waterPlaneLength, waterPlaneLength, waterZ)
-            vertex.addData3(waterPlaneLength, waterPlaneLength, waterZ)
-            vertex.addData3(waterPlaneLength, -waterPlaneLength, waterZ)
-            vertex.addData3(-waterPlaneLength, -waterPlaneLength, waterZ)
+            vertex.addData3(-waterPlaneLength, waterPlaneLength, self.waterZ)
+            vertex.addData3(waterPlaneLength, waterPlaneLength, self.waterZ)
+            vertex.addData3(waterPlaneLength, -waterPlaneLength, self.waterZ)
+            vertex.addData3(-waterPlaneLength, -waterPlaneLength, self.waterZ)
             texcoord.addData2(0, 0)
             texcoord.addData2(1, 0)
             texcoord.addData2(1, 1)
@@ -336,18 +336,18 @@ def ReceiveData():
                     ]
                 sensor_rot_z_array = [0, 90, 180, -90]
                 cam_pos = p3d.Vec3(0, 0, 50)
-                cam_rot_y = 10
+                cam_rot_y = -10
 
-                localCamMat = p3d.LMatrix4f.rotateMat(cam_rot_y, p3d.Vec3(0, 1, 0)) * p3d.LMatrix4f.translateMat(cam_pos)
-                sensorMat_array = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
+                localCamMat = p3d.LMatrix4f.rotateMat(cam_rot_y, p3d.Vec3(0, -1, 0)) * p3d.LMatrix4f.translateMat(cam_pos)
+                sensorMatLHS_array = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
                 imgIdx = 0
 
                 matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
                 for deg, pos in zip(sensor_rot_z_array, sensor_pos_array):
-                    sensorMat = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, 1)) * p3d.LMatrix4f.translateMat(pos.x, -pos.y, pos.z)
-                    sensorMat_array[imgIdx] = sensorMat
+                    sensorMatRHS = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, 1)) * p3d.LMatrix4f.translateMat(pos.x, -pos.y, pos.z)
+                    sensorMatLHS_array[imgIdx] = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, 1)) * p3d.LMatrix4f.translateMat(pos.x, pos.y, pos.z)
                     
-                    camMat = localCamMat * sensorMat
+                    camMat = localCamMat * sensorMatRHS
                     camMat3 = camMat.getUpper3()  # or, use xformVec instead
                     
                     # think... LHS to RHS...
@@ -397,7 +397,7 @@ def ReceiveData():
                 #    mySvm.plane.setShaderInput(
                 #        'semanticTex' + str(i), mySvm.semanticTexs[i])
 
-                mySvm.sensorMat_array = sensorMat_array
+                mySvm.sensorMatLHS_array = sensorMatLHS_array
                 print("Texture Initialized!")
                 
             if mySvm.isPointCloudSetup == True:
@@ -413,7 +413,7 @@ def ReceiveData():
                     numSingleLidarPoints = int.from_bytes(fullPackets[offsetPoints: 4 + offsetPoints], "little")
                     #print(("Num Process Points : {Num}").format(Num=numSingleLidarPoints))
 
-                    matSensor = mySvm.sensorMat_array[i] 
+                    matSensorLHS = mySvm.sensorMatLHS_array[i]
                     offsetPoints += 4
                     numProcessPoints += numSingleLidarPoints
                     for j in range(numSingleLidarPoints):
@@ -431,20 +431,21 @@ def ReceiveData():
                         offsetPoints += 16
                         posPoint = p3d.LPoint3f(pX, pY, pZ)
                         # to do : transform posPoint (local) to world
-                        posPointWS = matSensor.xformPoint(posPoint)
+                        posPointWS = matSensorLHS.xformPoint(posPoint)
                         posPointWS.y *= -1
-                        #if j == 0 : 
-                        #    print(matSensor)
-                        mySvm.pointsVertex.setData3f(posPointWS)
-                        #mySvm.pointsColor.setData4f(cB / 255.0, cG / 255.0, cR / 255.0, cA / 255.0)
-                        if i == 0:
-                            mySvm.pointsColor.setData4f(0, 0, 1, 1)
-                        elif i == 1:
-                            mySvm.pointsColor.setData4f(0, 1, 0, 1)
-                        elif i == 2:
-                            mySvm.pointsColor.setData4f(1, 0, 0, 1)
-                        elif i == 3:
-                            mySvm.pointsColor.setData4f(0, 1, 1, 1)
+                        
+                        if posPointWS.z > mySvm.waterZ + 1:
+                            mySvm.pointsVertex.setData3f(posPointWS)
+                            mySvm.pointsColor.setData4f(cB / 255.0, cG / 255.0, cR / 255.0, cA / 255.0)
+                        
+                        #if i == 0:
+                        #    mySvm.pointsColor.setData4f(0, 0, 1, 1)
+                        #elif i == 1:
+                        #    mySvm.pointsColor.setData4f(0, 1, 0, 1)
+                        #elif i == 2:
+                        #    mySvm.pointsColor.setData4f(1, 0, 0, 1)
+                        #elif i == 3:
+                        #    mySvm.pointsColor.setData4f(0, 1, 1, 1)
 
 
 
