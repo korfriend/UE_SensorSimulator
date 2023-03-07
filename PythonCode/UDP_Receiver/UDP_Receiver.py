@@ -29,6 +29,7 @@ class SurroundView(ShowBase):
         #보트 로드
         self.boat = self.loader.loadModel("avikus_boat.glb")
         self.boat.setScale(p3d.Vec3(100, 100, 100))
+        self.boat.set_hpr(0, 90, 90)
         bbox = self.boat.getTightBounds()
         print(bbox)
         center = (bbox[0] + bbox[1]) * 0.5
@@ -56,7 +57,7 @@ class SurroundView(ShowBase):
 
             bbox = svmBase.boat.getTightBounds()
             print(bbox)
-            self.waterZ = bbox[0].z + (bbox[1].z - bbox[0].z) * 0.2
+            self.waterZ = bbox[0].z + (bbox[1].z - bbox[0].z) * 0.7 # 0.2
             waterPlaneLength = 2500
             vertex.addData3(-waterPlaneLength, waterPlaneLength, self.waterZ)
             vertex.addData3(waterPlaneLength, waterPlaneLength, self.waterZ)
@@ -102,7 +103,10 @@ class SurroundView(ShowBase):
 
             
             # initial setting like the above code! (for resource optimization)
-            svmBase.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
+            # svmBase.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
+            svmBase.semanticTexArray = p3d.Texture()
+            svmBase.semanticTexArray.setup2dTextureArray(256, 256, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
+            svmBase.plane.setShaderInput('semanticImgs', svmBase.semanticTexArray)
 
         GeneratePlaneNode(self)
         self.accept('r', self.shaderRecompile)
@@ -328,11 +332,17 @@ def ReceiveData():
                 
                 projMat = createOglProjMatrix(90, 1, 1, 100000)
 
+                # sensor_pos_array = [
+                #     p3d.Vec3(30, 0, 40), 
+                #     p3d.Vec3(0, 60, 40), 
+                #     p3d.Vec3(-40, 0, 40), 
+                #     p3d.Vec3(0, -80, 40)
+                #     ]
                 sensor_pos_array = [
-                    p3d.Vec3(30, 0, 40), 
-                    p3d.Vec3(0, 60, 40), 
-                    p3d.Vec3(-40, 0, 40), 
-                    p3d.Vec3(0, -80, 40)
+                    p3d.Vec3(400, 0, 230), 
+                    p3d.Vec3(0, 170, 230), 
+                    p3d.Vec3(-400, 0, 230), 
+                    p3d.Vec3(0, -170, 230)
                     ]
                 sensor_rot_z_array = [0, 90, 180, -90]
                 cam_pos = p3d.Vec3(0, 0, 50)
@@ -401,6 +411,9 @@ def ReceiveData():
                 #        imageWidth, imageHeight, p3d.Texture.T_unsigned_byte, p3d.Texture.F_red)
                 #    mySvm.plane.setShaderInput(
                 #        'semanticTex' + str(i), mySvm.semanticTexs[i])
+
+                mySvm.semanticTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
+                mySvm.plane.setShaderInput('semantics', mySvm.semanticTexArray)
 
                 mySvm.sensorMatLHS_array = sensorMatLHS_array
                 print("Texture Initialized!")
@@ -483,20 +496,20 @@ def ReceiveData():
             
             for i in range(4):
                 #print(("AAA-1 {aa}, {bb}, {cc}").format(aa=imgBytes, bb=offsetColor, cc=i))
-                imgnp = np.array(
-                    fullPackets[offsetColor + imgBytes * i: offsetColor + imgBytes * (i + 1)], dtype=np.uint8)
+                if not isCustomImgs:
+                    imgnp = np.array(
+                        fullPackets[offsetColor + imgBytes * i: offsetColor + imgBytes * (i + 1)], dtype=np.uint8)
 
-                #print("AAA-2")
-                img = imgnp.reshape((imageWidth, imageHeight, 4))
-                
-                #print("AAA-3")
-                if ~isCustomImgs:
-                    # https://docs.panda3d.org/1.10/python/programming/texturing/simple-texturing
-                    # https://docs.panda3d.org/1.10/cpp/programming/advanced-loading/loading-resources-from-memory
+                    #print("AAA-2")
+                    img = imgnp.reshape((imageWidth, imageHeight, 4))
+                    
+                    #print("AAA-3")
+                        # https://docs.panda3d.org/1.10/python/programming/texturing/simple-texturing
+                        # https://docs.panda3d.org/1.10/cpp/programming/advanced-loading/loading-resources-from-memory
                     imgs.append(img)
                 else :
-                    if i % 2 == 0:  # imgs
-                        imgs.append(img)
+                    # if i % 2 == 0:  # imgs
+                        # imgs.append(img)
                         #print("AAA-4")
                         #mySvm.planeTexs[int(i / 2)].setRamImage(img)
 
@@ -506,30 +519,54 @@ def ReceiveData():
                         #mySvm.plane.setShaderInput(
                         #    'myTexture' + str(i), mySvm.planeTexs[i])
                         #print(("Plane Texture : {Num}").format(Num=i))
-                    else:  # semantics
-                        semantic = np.zeros_like(img).astype(np.uint8)
-                        img = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
-                        for j, color in enumerate(color_map):
-                            for k in range(3):
-                                semantic[:, :, k][img[:, :] == j] = color[k]
-                        semantics.append(semantic)
+                    # else:  # semantics
+                        # semantic = np.zeros_like(img).astype(np.uint8)
+                        # img = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
+                        # for j, color in enumerate(color_map):
+                        #     for k in range(3):
+                        #         semantic[:, :, k][img[:, :] == j] = color[k]
+                        # semantics.append(semantic)
                         # use sampler2DArray in glsl rather than sampler2D
                         # refer to 'sampler2DArray cameraImgs' and 'mySvm.planeTexArray.setRamImage(imgArray)'
-                        mySvm.semanticTexs[int(i / 2)].setRamImage(img)
+                        # mySvm.semanticTexs[int(i / 2)].setRamImage(img)
+                    imgnp = np.array(
+                        fullPackets[offsetColor + imgBytes * (i * 2) : offsetColor + imgBytes * (i * 2 + 1)], dtype=np.uint8)
+                    semanticnp = np.array(
+                        fullPackets[offsetColor + imgBytes * (i * 2 + 1) : offsetColor + imgBytes * (i * 2 + 2)], dtype=np.uint8)
+                    
+                    img = imgnp.reshape((imageWidth, imageHeight, 4))
+                    semantic = semanticnp.reshape((imageWidth, imageHeight, 4))
+                    color_img = np.zeros_like(semantic).astype(np.uint8)
+                    for j, color in enumerate(color_map):
+                        for k in range(3):
+                            color_img[:, :, k][semantic[:, :, 0] == j] = color[k]
 
-            imgnpArray = np.array(
-                fullPackets[offsetColor + imgBytes * 0: offsetColor + imgBytes * (3 + 1)], dtype=np.uint8)
-            imgArray = imgnpArray.reshape((imageWidth, imageHeight, 4, 4))
-            mySvm.planeTexArray.setRamImage(imgArray)
+                    imgs.append(img)
+                    semantics.append(color_img)
+
+            if not isCustomImgs:
+                imgnpArray = np.array(
+                    fullPackets[offsetColor + imgBytes * 0 : offsetColor + imgBytes * (3 + 1)], dtype=np.uint8)
+                imgArray = imgnpArray.reshape((4, imageWidth, imageHeight, 4))
+                mySvm.planeTexArray.setRamImage(imgArray)
+            else:
+                imgnpArray = np.array(
+                    fullPackets[offsetColor + imgBytes * 0 : offsetColor + imgBytes * 8], dtype=np.uint8)
+                imgArray = imgnpArray.reshape((8, imageWidth, imageHeight, 4))
+                cameraArray = imgArray[::2, :, :, :].copy()
+                semanticArray = imgArray[1::2, :, :, :].copy()
+                mySvm.planeTexArray.setRamImage(cameraArray)
+                mySvm.semanticTexArray.setRamImage(semanticArray)
 
             cv.imshow('image_deirvlon 0', imgs[0])
             cv.imshow('image_deirvlon 1', imgs[1])
             cv.imshow('image_deirvlon 2', imgs[2])
             cv.imshow('image_deirvlon 3', imgs[3])
-            #cv.imshow("semantic_deirvlon 0", semantics[0])
-            #cv.imshow("semantic_deirvlon 1", semantics[1])
-            #cv.imshow("semantic_deirvlon 2", semantics[2])
-            #cv.imshow("semantic_deirvlon 3", semantics[3])
+            if isCustomImgs:
+                cv.imshow("semantic_deirvlon 0", semantics[0])
+                cv.imshow("semantic_deirvlon 1", semantics[1])
+                cv.imshow("semantic_deirvlon 2", semantics[2])
+                cv.imshow("semantic_deirvlon 3", semantics[3])
             cv.waitKey(1)
             
 

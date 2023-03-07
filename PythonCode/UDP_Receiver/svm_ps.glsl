@@ -20,6 +20,7 @@ uniform mat4 matTest0;
 uniform mat4 matTest1;
 
 uniform sampler2DArray cameraImgs;
+uniform sampler2DArray semanticImgs;
 
 void main() {
     vec3 pos = worldcoord;
@@ -55,6 +56,9 @@ void main() {
             && texPos.y >= 0.0 && texPos.y <= 1.0) {
             // https://stackoverflow.com/questions/72648980/opengl-sampler2d-array
             colorOut = texture(cameraImgs, vec3(1 - texPos.x, 1 - texPos.y, i));
+            int label = int(texture(semanticImgs, vec3(1 - texPos.x, 1 - texPos.y, i)).r * 255);
+            if (label != 5) // sea
+                colorOut = colorOut / 10.0;
         }
     }
 #endif
