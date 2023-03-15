@@ -49,7 +49,7 @@ class SurroundView(ShowBase):
 
         draw_sphere(self, 500000, (0,0,0), (1,1,1,1))
         self.sphereShader = Shader.load(
-            Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps.glsl")
+            Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
         self.sphere.setShader(self.sphereShader)
 
         def GeneratePlaneNode(svmBase):
