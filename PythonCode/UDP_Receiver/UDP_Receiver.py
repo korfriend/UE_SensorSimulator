@@ -9,6 +9,7 @@ from direct.showbase.ShowBase import ShowBase
 from panda3d.core import Shader
 import panda3d.core as p3d
 import panda3d
+from draw_sphere import draw_sphere
 
 print('Pandas Version :', panda3d.__version__)
 
@@ -39,12 +40,18 @@ class SurroundView(ShowBase):
         self.axis = self.loader.loadModel('zup-axis')
         self.axis.setPos(0, 0, 0)
         self.axis.setScale(100)
-        self.axis.reparentTo(base.render)
+        self.axis.reparentTo(self.render)
         
         self.isPointCloudSetup = False
         self.lidarRes = 0
         self.lidarChs = 0
         self.numLidars = 0
+
+        draw_sphere(self, 500000, (0,0,0), (1,1,1,1))
+        self.sphereShader = Shader.load(
+            Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps.glsl")
+        self.sphere.setShader(self.sphereShader)
+
         def GeneratePlaneNode(svmBase):
             #shader setting for SVM
             svmBase.planeShader = Shader.load(
@@ -89,11 +96,13 @@ class SurroundView(ShowBase):
             #svmBase.planeTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
             for i in range(4):
                 svmBase.plane.setShaderInput('matViewProj' + str(i), p3d.Mat4())
+                svmBase.sphere.setShaderInput('matViewProj' + str(i), p3d.Mat4())
             #    svmBase.plane.setShaderInput('myTexture' + str(i), svmBase.planeTexs[i])
 
             svmBase.planeTexArray = p3d.Texture()
             svmBase.planeTexArray.setup2dTextureArray(256, 256, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
             svmBase.plane.setShaderInput('cameraImgs', svmBase.planeTexArray)
+            svmBase.sphere.setShaderInput('cameraImgs', svmBase.planeTexArray)
             svmBase.plane.setShaderInput("matTest0", p3d.Mat4())
             svmBase.plane.setShaderInput("matTest1", p3d.Mat4())
 
@@ -107,6 +116,7 @@ class SurroundView(ShowBase):
             svmBase.semanticTexArray = p3d.Texture()
             svmBase.semanticTexArray.setup2dTextureArray(256, 256, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
             svmBase.plane.setShaderInput('semanticImgs', svmBase.semanticTexArray)
+            svmBase.sphere.setShaderInput('semanticImgs', svmBase.semanticTexArray)
 
         GeneratePlaneNode(self)
         self.accept('r', self.shaderRecompile)
@@ -115,6 +125,9 @@ class SurroundView(ShowBase):
         self.planeShader = Shader.load(
             Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps.glsl")
         self.plane.setShader(mySvm.planeShader)
+        self.sphereShader = Shader.load(
+            Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
+        self.sphere.setShader(self.sphereShader)
 
 
 mySvm = SurroundView()
@@ -389,6 +402,7 @@ def ReceiveData():
                         #mySvm.plane.setShaderInput("matTest1", projMat)
 
                     mySvm.plane.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
+                    mySvm.sphere.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
                     imgIdx += 1
 
                 #mySvm.plane.setShaderInput("matViewProjs", matViewProjs)
@@ -401,6 +415,7 @@ def ReceiveData():
 
                 mySvm.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
                 mySvm.plane.setShaderInput('cameraImgs', mySvm.planeTexArray)
+                mySvm.sphere.setShaderInput('cameraImgs', mySvm.planeTexArray)
                 
                 if bytesRGBmap > imageWidth * imageHeight * 4 * numLidars:
                     # use this branch logic to add custom data in this scene
@@ -413,7 +428,7 @@ def ReceiveData():
                 #        'semanticTex' + str(i), mySvm.semanticTexs[i])
 
                 mySvm.semanticTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
-                mySvm.plane.setShaderInput('semantics', mySvm.semanticTexArray)
+                mySvm.plane.setShaderInput('semanticImgs', mySvm.semanticTexArray)
 
                 mySvm.sensorMatLHS_array = sensorMatLHS_array
                 print("Texture Initialized!")
