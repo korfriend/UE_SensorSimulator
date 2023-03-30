@@ -57,7 +57,7 @@ void main() {
             // https://stackoverflow.com/questions/72648980/opengl-sampler2d-array
             colorOut = texture(cameraImgs, vec3(1 - texPos.x, 1 - texPos.y, i));
             int label = int(texture(semanticImgs, vec3(1 - texPos.x, 1 - texPos.y, i)).r * 255);
-            if (label != 5) // sea
+            if (label != 2) // sea
                 colorOut = colorOut / 10.0;
         }
     }
