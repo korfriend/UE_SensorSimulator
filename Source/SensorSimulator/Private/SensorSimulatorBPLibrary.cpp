@@ -54,6 +54,7 @@ auto LidarScan = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPoin
 	float texWidth = (float)textureRT->SizeX;
 	float texHeight = (float)textureRT->SizeY;
 
+	//GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, FString::FromInt(textureRT->SizeX) + ", " + FString::FromInt(textureRT->SizeY));
 	//sceneCapture->HiddenActors()
 
 	FMatrix ViewMatrix, ProjectionMatrix, ViewProjectionMatrix;

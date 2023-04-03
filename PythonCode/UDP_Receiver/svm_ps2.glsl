@@ -20,32 +20,14 @@ uniform mat4 matTest0;
 uniform mat4 matTest1;
 
 uniform sampler2DArray cameraImgs;
+uniform sampler2DArray semanticImgs;
 
 void main() {
     vec3 pos = worldcoord;
     mat4 viewProjs[4] = {matViewProj0, matViewProj1, matViewProj2, matViewProj3};
 
     vec4 colorOut = vec4(0); 
-#ifdef __DEBUG
-    vec4 imagePos = matViewProj0 * vec4(pos, 1.0);
-    vec3 imagePos3 = imagePos.xyz / imagePos.w;
-    vec2 texPos = (imagePos3.xy + vec2(1.0, 1.0)) * 0.5;
-    if(imagePos3.z < 0)
-        colorOut = vec4(0.01f, 0.0f, 0.0f, 1.0f);
-    else if(imagePos3.z > 1)
-        colorOut = vec4(0.5, 0, 1, 1);
-    else if(texPos.x < 0)
-        colorOut = vec4(1, 0, 0, 1);
-    else if(texPos.y < 0)
-        colorOut = vec4(0, 1, 0, 1);
-    else if(texPos.x > 1)
-        colorOut = vec4(0, 0, 1, 1);
-    else if(texPos.y > 1)
-        colorOut = vec4(1, 1, 0, 1);
-    else {
-        colorOut = texture(cameraImgs, vec3(1 - texPos.x, 1 - texPos.y, 0));//vec4(texPos, 0, 1);
-    }
-#else
+    
     for (int i = 0; i < 4; i++) {
         vec4 imagePos = viewProjs[i] * vec4(pos, 1.0);
         vec3 imagePos3 = imagePos.xyz / imagePos.w;
@@ -55,9 +37,12 @@ void main() {
             && texPos.y >= 0.0 && texPos.y <= 1.0) {
             // https://stackoverflow.com/questions/72648980/opengl-sampler2d-array
             colorOut = texture(cameraImgs, vec3(1 - texPos.x, 1 - texPos.y, i));
+            //int label = int(texture(semanticImgs, vec3(1 - texPos.x, 1 - texPos.y, i)).r * 255);
+            //if (label != 2) // sea
+            //    colorOut = colorOut / 10.0;
         }
     }
-#endif
+    
     /**/
     p3d_FragColor = colorOut;
     /*
