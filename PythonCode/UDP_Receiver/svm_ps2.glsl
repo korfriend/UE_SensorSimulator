@@ -1,7 +1,7 @@
 #version 430
 //#extension GL_EXT_texture_array
 //#extension GL_NV_texture_array
-
+const float PI = 3.14159265359;
 // fragment-pixel output color
 out vec4 p3d_FragColor;
 
@@ -67,7 +67,54 @@ void main() {
 
             int enc = idx0 * 2 + idx1;
             switch(enc) {
-                case 1: colorOut = vec4(1, 1, 0, 1); break;
+                case 1: {
+                    //const float camMaxAngle0 = 150.0 / 2.0 * PI / 180.0;
+                    //const float camMaxAngle1 = 150.0 / 2.0 * PI / 180.0;
+                    //vec2 vec0 = vec2(1, 0);
+                    //vec2 vec1 = vec2(0, -1);
+                    //vec2 vecC0 = normalize(pos.xy - camPos0.xy);
+                    //vec2 vecC1 = normalize(pos.xy - camPos1.xy);
+                    //float angle0 = acos(dot(vecC0, vec0));
+                    //float angle1 = acos(dot(vecC1, vec1));
+                    //float w0, w1;
+                    //if(true) {
+                    //    w0 = (camMaxAngle0 - angle0) / camMaxAngle0;
+                    //    w1 = 1.0 - w0;
+                    //}
+                    //else {
+                    //    w1 = (camMaxAngle1 - angle1) / camMaxAngle1;
+                    //    w0 = 1.0 - w1;
+                    //}
+
+                    const float bias0 = 1.0;
+                    const float bias1 = 1.0;
+
+
+                    vec4 imagePos = viewProjs[0] * vec4(pos, 1.0);
+                    vec2 imagePos2D = imagePos.xy / imagePos.w;
+                    vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+
+                    imagePos = viewProjs[1] * vec4(pos, 1.0);
+                    imagePos2D = imagePos.xy / imagePos.w;
+                    vec2 texPos1 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+
+                    float u0 = texPos0.x;
+                    float u1 = 1.0 - texPos1.x;
+                    float v0 = texPos0.y;
+                    float v1 = texPos1.y;
+
+                    float w0 = u0, w1 = u1;
+                    if (u0 > v0 && u1 > v1) 
+                    {
+                        w0 = v0;
+                        w1 = v1;
+                    }
+                    w0 *= bias0;
+                    w1 *= bias1;
+                    colorOut = vec4(w0 / (w0 + w1), w1 / (w0 + w1), 0, 1); 
+                    //colorOut = vec4(1, 1, 0, 1); 
+                    break;
+                }
                 case 4: colorOut = vec4(0, 1, 1, 1); break;
                 case 7: colorOut = vec4(0.5, 0.5, 1, 1); break;
                 case 3: colorOut = vec4(1, 0.5, 0.5, 1); break;
