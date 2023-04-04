@@ -40,7 +40,7 @@ class SurroundView(ShowBase):
         self.axis = self.loader.loadModel('zup-axis')
         self.axis.setPos(0, 0, 0)
         self.axis.setScale(100)
-        self.axis.reparentTo(self.render)
+        #self.axis.reparentTo(self.render)
         
         self.isPointCloudSetup = False
         self.lidarRes = 0
@@ -106,9 +106,9 @@ class SurroundView(ShowBase):
             svmBase.plane.setShaderInput("matTest0", p3d.Mat4())
             svmBase.plane.setShaderInput("matTest1", p3d.Mat4())
 
-            #aa = [p3d.LVector4f(), p3d.LVector4f(),
-            #      p3d.LVector4f(), p3d.LVector4f()]
-            #svmBase.plane.setShaderInput("testInts", aa)
+            svmBase.camPositions = [p3d.LVector4f(), p3d.LVector4f(),
+                  p3d.LVector4f(), p3d.LVector4f()]
+            svmBase.plane.setShaderInput("camPos", svmBase.camPositions)
 
             
             # initial setting like the above code! (for resource optimization)
@@ -363,11 +363,16 @@ def ReceiveData():
                 localCamMat = p3d.LMatrix4f.rotateMat(cam_rot_y, p3d.Vec3(0, -1, 0)) * p3d.LMatrix4f.translateMat(cam_pos)
                 sensorMatLHS_array = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
                 imgIdx = 0
+                
+                for sensorPos, camPos in zip(sensor_pos_array, mySvm.camPositions):
+                    camPos = sensorPos + cam_pos
+                    
+                mySvm.plane.setShaderInput("camPositions", mySvm.camPositions)
 
                 matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
                 for deg, pos in zip(sensor_rot_z_array, sensor_pos_array):
                     sensorMatRHS = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, -1)) * p3d.LMatrix4f.translateMat(pos.x, -pos.y, pos.z)
-                    sensorMatLHS_array[imgIdx] = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, -1)) * p3d.LMatrix4f.translateMat(pos.x, pos.y, pos.z)
+                    sensorMatLHS_array[imgIdx] = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, 1)) * p3d.LMatrix4f.translateMat(pos.x, pos.y, pos.z)
                     
                     camMat = localCamMat * sensorMatRHS
                     #camMat3 = camMat.getUpper3()  # or, use xformVec instead
@@ -463,10 +468,12 @@ def ReceiveData():
                         # to do : transform posPoint (local) to world
                         posPointWS = matSensorLHS.xformPoint(posPoint)
                         posPointWS.y *= -1
-                        
-                        if posPointWS.z > mySvm.waterZ + 1:
-                            mySvm.pointsVertex.setData3f(posPointWS)
-                            mySvm.pointsColor.setData4f(cB / 255.0, cG / 255.0, cR / 255.0, cA / 255.0)
+                        #y = posPointWS.y
+                        #posPointWS.y = posPointWS.x
+                        #posPointWS.x = y 
+                        #if posPointWS.z > mySvm.waterZ + 1:
+                        mySvm.pointsVertex.setData3f(posPointWS)
+                        mySvm.pointsColor.setData4f(cR / 255.0, cG / 255.0, cB / 255.0, cA / 255.0)
                         
                         #if i == 0:
                         #    mySvm.pointsColor.setData4f(0, 0, 1, 1)
