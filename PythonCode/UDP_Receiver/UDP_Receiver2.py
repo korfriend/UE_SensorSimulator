@@ -6,10 +6,11 @@ import numpy as np
 import math
 import cv2 as cv
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import Shader
+from panda3d.core import Shader, ShaderAttrib
 import panda3d.core as p3d
 import panda3d
 from draw_sphere import draw_sphere
+from direct.filter.FilterManager import FilterManager
 
 print('Pandas Version :', panda3d.__version__)
 
@@ -17,6 +18,10 @@ print('Pandas Version :', panda3d.__version__)
 class SurroundView(ShowBase):
     def __init__(self):
         super().__init__()
+        
+        winprops = p3d.WindowProperties()
+        winprops.setSize(1024, 1024)
+        self.win.requestProperties(winprops)
         
         # https://docs.panda3d.org/1.10/python/programming/render-attributes/antialiasing
         self.render.setAntialias(p3d.AntialiasAttrib.MAuto)
@@ -46,7 +51,7 @@ class SurroundView(ShowBase):
         self.lidarRes = 0
         self.lidarChs = 0
         self.numLidars = 0
-
+        
         draw_sphere(self, 500000, (0,0,0), (1,1,1,1))
         self.sphereShader = Shader.load(
             Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
@@ -128,10 +133,22 @@ class SurroundView(ShowBase):
         self.sphereShader = Shader.load(
             Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
         self.sphere.setShader(self.sphereShader)
-
+        
+        #self.quad.setShader(Shader.load(
+        #        Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="post1_ps.glsl"))   
 
 mySvm = SurroundView()
 
+manager = FilterManager(mySvm.win, mySvm.cam)
+width = mySvm.win.get_x_size()
+height = mySvm.win.get_y_size()
+print('{}, {}'.format(width, height))
+tex = p3d.Texture()
+tex.setup2dTexture(width, height, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
+quad = manager.renderSceneInto(colortex=tex)
+quad.setShader(Shader.load(
+                Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="post1_ps.glsl"))      
+quad.setShaderInput("k_tex", tex)
 
 #vertices = np.random.uniform(-30.0, 30.0, size=(12800, 3)).astype(np.float32)
 #colors = np.random.uniform(0.0, 1.0, size=(12800, 3)).astype(np.float32) # 무작위 색상
