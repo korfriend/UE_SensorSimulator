@@ -108,7 +108,7 @@ class SurroundView(ShowBase):
 
             svmBase.camPositions = [p3d.LVector4f(), p3d.LVector4f(),
                   p3d.LVector4f(), p3d.LVector4f()]
-            svmBase.plane.setShaderInput("camPos", svmBase.camPositions)
+            svmBase.plane.setShaderInput("camPositions", svmBase.camPositions)
 
             
             # initial setting like the above code! (for resource optimization)
@@ -473,7 +473,7 @@ def ReceiveData():
                         #posPointWS.x = y 
                         #if posPointWS.z > mySvm.waterZ + 1:
                         mySvm.pointsVertex.setData3f(posPointWS)
-                        mySvm.pointsColor.setData4f(cR / 255.0, cG / 255.0, cB / 255.0, cA / 255.0)
+                        mySvm.pointsColor.setData4f(cB / 255.0, cG / 255.0, cR / 255.0, cA / 255.0)
                         
                         #if i == 0:
                         #    mySvm.pointsColor.setData4f(0, 0, 1, 1)

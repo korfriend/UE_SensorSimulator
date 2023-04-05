@@ -86,7 +86,7 @@ void main() {
                     //    w0 = 1.0 - w1;
                     //}
 
-                    const float bias0 = 1.0;
+                    const float bias0 = 5.0;
                     const float bias1 = 1.0;
 
 
@@ -106,13 +106,16 @@ void main() {
                     float w0 = u0, w1 = u1;
                     if (u0 > v0 && u1 > v1) 
                     {
-                        w0 = v0;
-                        w1 = v1;
+                        w0 = v0;// + u0;
+                        w1 = v1;// + u1;
                     }
                     w0 *= bias0;
                     w1 *= bias1;
                     colorOut = vec4(w0 / (w0 + w1), w1 / (w0 + w1), 0, 1); 
                     //colorOut = vec4(1, 1, 0, 1); 
+                    vec4 img1 = texture(cameraImgs, vec3(1 - texPos0.x, 1 - texPos0.y, 0));
+                    vec4 img2 = texture(cameraImgs, vec3(1 - texPos1.x, 1 - texPos1.y, 1));
+                    colorOut = w0 / (w0 + w1) * img1 + w1 / (w0 + w1) * img2;
                     break;
                 }
                 case 4: colorOut = vec4(0, 1, 1, 1); break;
