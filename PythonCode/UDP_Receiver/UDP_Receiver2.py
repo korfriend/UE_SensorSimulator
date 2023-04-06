@@ -12,6 +12,10 @@ import panda3d
 from draw_sphere import draw_sphere
 from direct.filter.FilterManager import FilterManager
 
+from matplotlib import cm
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+colormap = cm.get_cmap('viridis', 1000)
+
 print('Pandas Version :', panda3d.__version__)
 
 ############ Main Thread
@@ -26,7 +30,7 @@ class SurroundView(ShowBase):
         # https://docs.panda3d.org/1.10/python/programming/render-attributes/antialiasing
         self.render.setAntialias(p3d.AntialiasAttrib.MAuto)
         # 카메라 위치 조정 
-        self.cam.setPos(0, 0, 2000)
+        self.cam.setPos(0, 0, 4000)
         self.cam.lookAt(p3d.LPoint3f(0, 0, 0), p3d.LVector3f(0, 1, 0))
         #self.trackball.node().setMat(self.cam.getMat())
         #self.trackball.node().reset()
@@ -482,6 +486,7 @@ def ReceiveData():
                         #    print(("clr : {}, {}, {}, {}, {}, {}").format(i, offsetPoints, cR, cG, cB, cA))
                         offsetPoints += 16
                         posPoint = p3d.LPoint3f(pX, pY, pZ)
+                        
                         # to do : transform posPoint (local) to world
                         posPointWS = matSensorLHS.xformPoint(posPoint)
                         posPointWS.y *= -1
@@ -489,6 +494,12 @@ def ReceiveData():
                         #posPointWS.y = posPointWS.x
                         #posPointWS.x = y 
                         #if posPointWS.z > mySvm.waterZ + 1:
+                        
+                        color = colormap(posPointWS.z/150)
+                        cR = color[0] * 255.0
+                        cG = color[1] * 255.0
+                        cB = color[2] * 255.0
+                        
                         mySvm.pointsVertex.setData3f(posPointWS)
                         mySvm.pointsColor.setData4f(cB / 255.0, cG / 255.0, cR / 255.0, cA / 255.0)
                         
