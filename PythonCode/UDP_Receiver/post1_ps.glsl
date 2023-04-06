@@ -18,4 +18,5 @@ void main()
     float moyenne = (c.x + c.y + c.z)/3;
     //o_color = float4(moyenne, moyenne, moyenne, 1);
     p3d_FragColor = c;//vec4(l_texcoord0, 0, 1);
+    p3d_FragColor = vec4(l_texcoord0, 0, 1);
 }
