@@ -18,13 +18,15 @@ colormap = cm.get_cmap('viridis', 1000)
 
 print('Pandas Version :', panda3d.__version__)
 
+winSizeX = 1024
+winSizeY = 1024
 ############ Main Thread
 class SurroundView(ShowBase):
     def __init__(self):
         super().__init__()
         
         winprops = p3d.WindowProperties()
-        winprops.setSize(1024, 1024)
+        winprops.setSize(winSizeX, winSizeX)
         self.win.requestProperties(winprops)
         
         # https://docs.panda3d.org/1.10/python/programming/render-attributes/antialiasing
@@ -36,6 +38,28 @@ class SurroundView(ShowBase):
         #self.trackball.node().reset()
         #self.trackball.node().set_pos(0, 30, 0)
         
+        self.renderObj = p3d.NodePath("fgRender")
+        self.renderSVM = p3d.NodePath("bgRender")
+        
+        # Set up a buffer for the first pass
+        self.buffer1 = self.win.makeTextureBuffer("buffer1", winSizeX, winSizeY)
+        self.buffer1.setClearColor(p3d.Vec4(0, 0, 0, 1))
+        self.buffer1.setSort(0)
+
+        # Set up a camera for the first pass
+        self.cam1 = self.makeCamera(self.buffer1, scene=self.renderObj, lens=self.cam.node().getLens())
+        self.cam1.reparentTo(self.cam)
+
+        # Set up a buffer for the second pass
+        self.buffer2 = self.win.makeTextureBuffer("buffer2", winSizeX, winSizeY)
+        self.buffer2.setClearColor(p3d.Vec4(0, 0, 0, 1))
+        self.buffer2.setSort(1)
+
+        # Set up a camera for the second pass
+        self.cam2 = self.makeCamera(self.buffer2, scene=self.renderSVM, lens=self.cam.node().getLens())
+        self.cam2.reparentTo(self.cam)
+
+        
         #보트 로드
         self.boat = self.loader.loadModel("avikus_boat.glb")
         self.boat.setScale(p3d.Vec3(30, 30, 30))
@@ -44,12 +68,14 @@ class SurroundView(ShowBase):
         print(bbox)
         center = (bbox[0] + bbox[1]) * 0.5
         self.boat.setPos(-bbox[0].z)
-        self.boat.reparentTo(self.render)
+        self.boat.reparentTo(self.renderObj)
+        self.boat.setTag("ObjScene", "True")
         
         self.axis = self.loader.loadModel('zup-axis')
         self.axis.setPos(0, 0, 0)
         self.axis.setScale(100)
-        #self.axis.reparentTo(self.render)
+        self.axis.reparentTo(self.renderObj)
+        self.axis.setTag("ObjScene", "True")
         
         self.isPointCloudSetup = False
         self.lidarRes = 0
@@ -60,6 +86,8 @@ class SurroundView(ShowBase):
         self.sphereShader = Shader.load(
             Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
         self.sphere.setShader(self.sphereShader)
+        self.sphere.reparentTo(self.renderObj)
+        self.sphere.setTag("ObjScene", "True")
 
         def GeneratePlaneNode(svmBase):
             #shader setting for SVM
@@ -96,7 +124,6 @@ class SurroundView(ShowBase):
             svmBase.plane = p3d.NodePath(geomNode)
             svmBase.plane.setTwoSided(True)
             svmBase.plane.setShader(svmBase.planeShader)
-            svmBase.plane.reparentTo(svmBase.render)
 
             # the following mat4 array does not work... 
             #matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
@@ -128,7 +155,21 @@ class SurroundView(ShowBase):
             svmBase.sphere.setShaderInput('semanticImgs', svmBase.semanticTexArray)
 
         GeneratePlaneNode(self)
+        self.plane.reparentTo(self.renderSVM)
+        self.plane.setTag("SvmScene", "True")
         self.accept('r', self.shaderRecompile)
+        
+        self.cam1.node().setInitialState(self.renderObj.getState())
+        self.cam1.node().setTagStateKey("ObjScene")
+        self.cam1.node().setTagState("True", self.renderObj.getState())
+
+        self.cam2.node().setInitialState(self.renderSVM.getState())
+        self.cam2.node().setTagStateKey("SvmScene")
+        self.cam2.node().setTagState("True", self.renderSVM.getState())
+        
+        self.bufferViewer.setPosition("llcorner")
+        self.bufferViewer.setCardSize(0.5, 0)
+        self.accept("v", self.bufferViewer.toggleEnable)
 
     def shaderRecompile(self):
         self.planeShader = Shader.load(
@@ -138,21 +179,23 @@ class SurroundView(ShowBase):
             Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
         self.sphere.setShader(self.sphereShader)
         
-        #self.quad.setShader(Shader.load(
-        #        Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="post1_ps.glsl"))   
+        self.quad.setShader(Shader.load(
+                Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="post1_ps.glsl"))   
 
 mySvm = SurroundView()
+mySvm.bufferViewer.enable(1)
 
 manager = FilterManager(mySvm.win, mySvm.cam)
 width = mySvm.win.get_x_size()
 height = mySvm.win.get_y_size()
 print('{}, {}'.format(width, height))
-tex = p3d.Texture()
-tex.setup2dTexture(width, height, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
-quad = manager.renderSceneInto(colortex=tex)
-quad.setShader(Shader.load(
+#tex = p3d.Texture()
+#tex.setup2dTexture(width, height, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
+mySvm.quad = manager.renderSceneInto(colortex=None) # make dummy texture... for post processing...
+#mySvm.quad = manager.renderQuadInto(colortex=tex)
+mySvm.quad.setShader(Shader.load(
                 Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="post1_ps.glsl"))      
-quad.setShaderInput("k_tex", tex)
+mySvm.quad.setShaderInput("k_tex", mySvm.buffer1.get_texture())
 
 #vertices = np.random.uniform(-30.0, 30.0, size=(12800, 3)).astype(np.float32)
 #colors = np.random.uniform(0.0, 1.0, size=(12800, 3)).astype(np.float32) # 무작위 색상
@@ -208,7 +251,9 @@ def GeneratePointNode(task):
     svmBase.points = p3d.NodePath(geomNode)
     svmBase.points.setTwoSided(True)
     #self.points.setShader(svmBase.planeShader)
-    svmBase.points.reparentTo(svmBase.render)
+    #svmBase.points.reparentTo(svmBase.render)
+    svmBase.points.reparentTo(svmBase.renderObj)
+    svmBase.points.setTag("ObjScene", "True")
 
     #material = p3d.Material()
     #material.setShininess(1000)

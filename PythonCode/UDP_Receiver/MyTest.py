@@ -68,8 +68,8 @@ class SurroundView(ShowBase):
         #self.camNode.setLens(self.camLens)
         #self.cam = self.render.attachNewNode(self.camNode)
 
-        foreground_render = NodePath("foreground_render")
-        background_render = NodePath("background_render")
+        foreground_render = NodePath("fgRender")
+        background_render = NodePath("bgRender")
         
         # Set up a buffer for the first pass
         self.buffer1 = self.win.makeTextureBuffer("buffer1", 1024, 1024)
