@@ -626,8 +626,8 @@ def ReceiveData():
                     semanticnp = np.array(
                         fullPackets[offsetColor + imgBytes * (i * 2 + 1) : offsetColor + imgBytes * (i * 2 + 2)], dtype=np.uint8)
                     
-                    img = imgnp.reshape((imageWidth, imageHeight, 4))
-                    semantic = semanticnp.reshape((imageWidth, imageHeight, 4))
+                    img = imgnp.reshape((imageHeight, imageWidth, 4))
+                    semantic = semanticnp.reshape((imageHeight, imageWidth, 4))
                     color_img = np.zeros_like(semantic).astype(np.uint8)
                     for j, color in enumerate(color_map):
                         for k in range(3):
@@ -639,12 +639,12 @@ def ReceiveData():
             if not isCustomImgs:
                 imgnpArray = np.array(
                     fullPackets[offsetColor + imgBytes * 0 : offsetColor + imgBytes * (3 + 1)], dtype=np.uint8)
-                imgArray = imgnpArray.reshape((4, imageWidth, imageHeight, 4))
+                imgArray = imgnpArray.reshape((4, imageHeight, imageWidth, 4))
                 mySvm.planeTexArray.setRamImage(imgArray)
             else:
                 imgnpArray = np.array(
                     fullPackets[offsetColor + imgBytes * 0 : offsetColor + imgBytes * 8], dtype=np.uint8)
-                imgArray = imgnpArray.reshape((8, imageWidth, imageHeight, 4))
+                imgArray = imgnpArray.reshape((8, imageHeight, imageWidth, 4))
                 cameraArray = imgArray[::2, :, :, :].copy()
                 semanticArray = imgArray[1::2, :, :, :].copy()
                 mySvm.planeTexArray.setRamImage(cameraArray)
