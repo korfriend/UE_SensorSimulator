@@ -183,7 +183,7 @@ class SurroundView(ShowBase):
                 Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="post1_ps.glsl"))   
 
 mySvm = SurroundView()
-mySvm.bufferViewer.enable(1)
+#mySvm.bufferViewer.enable(1)
 
 manager = FilterManager(mySvm.win, mySvm.cam)
 width = mySvm.win.get_x_size()
@@ -194,8 +194,9 @@ print('{}, {}'.format(width, height))
 mySvm.quad = manager.renderSceneInto(colortex=None) # make dummy texture... for post processing...
 #mySvm.quad = manager.renderQuadInto(colortex=tex)
 mySvm.quad.setShader(Shader.load(
-                Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="post1_ps.glsl"))      
-mySvm.quad.setShaderInput("k_tex", mySvm.buffer1.get_texture())
+                Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="post1_ps.glsl"))
+mySvm.quad.setShaderInput("texPass0", mySvm.buffer1.get_texture())
+mySvm.quad.setShaderInput("texPass1", mySvm.buffer2.get_texture())
 
 #vertices = np.random.uniform(-30.0, 30.0, size=(12800, 3)).astype(np.float32)
 #colors = np.random.uniform(0.0, 1.0, size=(12800, 3)).astype(np.float32) # 무작위 색상

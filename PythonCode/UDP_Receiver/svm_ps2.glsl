@@ -87,6 +87,7 @@ vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, 
 
 void main() {
     vec3 pos = worldcoord;
+    pos.z = 100;
     mat4 viewProjs[4] = {matViewProj0, matViewProj1, matViewProj2, matViewProj3};
 
     vec4 colorOut = vec4(0); 
@@ -94,6 +95,8 @@ void main() {
     int count = 0;
     int overlapIndex[4] = {0, 0, 0, 0};
     for (int i = 0; i < 4; i++) {
+        //vec3 postemp= pos;
+        //if( i == 3 || i == 0) postemp.z = 100;
         vec4 imagePos = viewProjs[i] * vec4(pos, 1.0);
         vec3 imagePos3 = imagePos.xyz / imagePos.w;
         vec2 texPos = (imagePos3.xy + vec2(1.0, 1.0)) * 0.5;
@@ -152,7 +155,7 @@ void main() {
                     break;
                 }
                 case 3: {
-                    colorOut = blendArea(3, 0, pos, viewProjs, enc, 0.5, debugMode);
+                    colorOut = blendArea(3, 0, pos, viewProjs, enc, 0.1, debugMode);
                     break;
                 }
             }

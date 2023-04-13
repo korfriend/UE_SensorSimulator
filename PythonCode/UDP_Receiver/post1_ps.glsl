@@ -3,12 +3,13 @@
 in vec2 l_texcoord0;
 out vec4 p3d_FragColor;
 
-uniform sampler2D k_tex;
+uniform sampler2D texPass0;
+uniform sampler2D texPass1;
 
 
 void main()
 {
-    vec4 c = texture(k_tex, l_texcoord0);
+    vec4 c = texture(texPass1, l_texcoord0);
 
     // To have a useless filter that outputs the original view
     // without changing anything, just use :
