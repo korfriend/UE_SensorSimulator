@@ -1,0 +1,11 @@
+{
+    "packetNum": 82,
+    "bytesPoints": 47840,
+    "bytesDepthmap": 51200,
+    "bytesRGBmap": 4800000,
+    "numLidars": 4,
+    "lidarRes": 100,
+    "lidarChs": 32,
+    "imageWidth": 500,
+    "imageHeight": 300
+}

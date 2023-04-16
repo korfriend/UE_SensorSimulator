@@ -17,9 +17,6 @@ uniform mat4 matViewProj3;
 
 uniform vec4 camPositions[4];
 
-uniform mat4 matTest0;
-uniform mat4 matTest1;
-
 uniform sampler2DArray cameraImgs;
 uniform sampler2DArray semanticImgs;
 
@@ -87,7 +84,7 @@ vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, 
 
 void main() {
     vec3 pos = worldcoord;
-    pos.z = 100;
+    //pos.z = 100;
     mat4 viewProjs[4] = {matViewProj0, matViewProj1, matViewProj2, matViewProj3};
 
     vec4 colorOut = vec4(0); 
@@ -125,6 +122,8 @@ void main() {
                 vec2 imagePos2D = imagePos.xy / imagePos.w;
                 vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
                 colorOut = texture(cameraImgs, vec3(1 - texPos0.x, 1 - texPos0.y, camId));
+                int semantic = int(texture(semanticImgs, vec3(1 - texPos0.x, 1 - texPos0.y, camId)).r * 255.0 + 0.5);
+                if(semantic > 0) colorOut = vec4(1, 0, 0, 1);
             }
             break;
         }
