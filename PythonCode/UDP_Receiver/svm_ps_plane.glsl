@@ -31,7 +31,7 @@ void main() {
 
     int count = 0;
     int mapProp = 0;    // 0 : undef, 1 : ground, 2 : target geometry
-    int overlapIndex[4] = {0, 0, 0, 0};
+    int overlapIndex[4] = {-1, -1, -1, -1};
     for (int i = 0; i < 4; i++) 
     {
         vec4 imagePos = viewProjs[i] * vec4(pos, 1.0);
@@ -43,7 +43,7 @@ void main() {
                 overlapIndex[count++] = i;
                 //int semantic = int(texture(semanticImgs, vec3(1 - texPos.x, 1 - texPos.y, i)).r * 255.0 + 0.5);
                 
-                const ivec2 texIdx2d = ivec2((1 - texPos.x) * 500, (1 - texPos.y) * 300);
+                const ivec2 texIdx2d = ivec2((1 - texPos.x) * 500 + 0.5, (1 - texPos.y) * 300 + 0.5);
                 int semantic = texelFetch(semanticImgs, ivec3(texIdx2d, i), 0).r;
                 if (semantic > mapProp) mapProp = semantic;
         }
