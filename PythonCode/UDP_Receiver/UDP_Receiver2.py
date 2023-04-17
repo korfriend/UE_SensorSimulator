@@ -656,7 +656,7 @@ def ProcSvmFromPackets(base, fullPackets, packetNum,
         cv.imshow("semantic_deirvlon 3", semantics[3])
     cv.waitKey(1)
     
-timeout = 5
+timeout = 2
 UDPServerSocket.settimeout(timeout)
 def ReceiveData():
     # Listen for incoming datagrams
