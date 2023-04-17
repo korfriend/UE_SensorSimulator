@@ -52,5 +52,6 @@ void main() {
     p3d_FragColor = vec4(0, 0, 1, 1);
     
     frag_color0 = uvec4(floatBitsToUint(pos), count);
-    frag_color1 = uvec4(mapProp, overlapIndex[0], overlapIndex[1], 0);
+    //frag_color1 = uvec4(mapProp, overlapIndex[0], overlapIndex[1], 0);
+    frag_color1 = uvec4(0, 0, 3, 4);
 }

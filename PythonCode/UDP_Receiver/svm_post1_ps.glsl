@@ -110,8 +110,9 @@ void main()
     uint camId1 = geoInfo1.z;
 
     vec4 colorOut = vec4(0, 0, 0, 1);
-//#define MYDEBUG__
+#define MYDEBUG__
 #ifdef MYDEBUG__ 
+    /**/
     if (count > 0) {
         switch(semantic) {
             case 1 : colorOut = vec4(0, 1, 0, 1); break;
@@ -120,7 +121,7 @@ void main()
             default : colorOut = vec4(1, 1, 1, 1); break;
         }
     }
-    /**
+    /**/
     switch(count) {
         case 1 : colorOut = vec4(0, 1, 0, 1); break;
         case 2 : colorOut = vec4(1, 0, 0, 1); break;
