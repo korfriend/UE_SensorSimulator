@@ -69,8 +69,12 @@ class SurroundView(ShowBase):
         #tex1.setup2dTexture(winSizeX, winSizeY, p3d.Texture.T_int, p3d.Texture.F_rgba32)
         #tex2.setup2dTexture(winSizeX, winSizeY, p3d.Texture.T_int, p3d.Texture.F_rgba32)
 
+        # RTM_bind_or_copy
         self.buffer1.addRenderTexture(tex1, p3d.GraphicsOutput.RTM_bind_or_copy, p3d.GraphicsOutput.RTP_aux_rgba_0)
         self.buffer1.addRenderTexture(tex2, p3d.GraphicsOutput.RTM_bind_or_copy, p3d.GraphicsOutput.RTP_aux_rgba_1)
+
+        #self.texCopyBack = p3d.Texture()
+        #self.texCopyBack.setup2dTexture(winSizeX, winSizeY, p3d.Texture.T_int, p3d.Texture.F_rgba32)
 
         #cm = p3d.CardMaker("card")
         #cm.setFrameFullscreenQuad()
@@ -125,18 +129,48 @@ class SurroundView(ShowBase):
         self.sphere.setShader(self.sphereShader)
         self.sphere.reparentTo(self.renderObj)
         self.sphere.setTag("ObjScene", "True")
+
+
         
+        '''
+        # Set up the second offscreen buffer with RTM_copy_ram
+        self.buffer3 = self.win.makeTextureBuffer("buffer3", winSizeX, winSizeY, to_ram=True, fbp=fb_props)
+        
+        # Create a texture and add it to the second buffer
+        self.tex3 = p3d.Texture()
+        self.buffer3.add_render_texture(self.tex3, p3d.GraphicsOutput.RTM_copy_ram)
+
+        # Create a fullscreen quad
+        cm = p3d.CardMaker("quad3")
+        cm.set_frame_fullscreen_quad()
+        self.quad3 = self.render2d.attach_new_node(cm.generate())
+
+        # Set the first texture as the texture for the quad
+        self.quad3.set_texture(self.buffer1.getTexture(2))
+        
+        # Set up the camera to render to the second buffer
+        self.buffer_cam3 = self.make_camera(self.buffer3)
+        self.buffer_cam3.reparent_to(self.render2d)
+        '''
+
+
+        
+
+
         manager = FilterManager(self.win, self.cam)
         #tex = p3d.Texture()
         #tex.setup2dTexture(width, height, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
         self.quad = manager.renderSceneInto(colortex=None) # make dummy texture... for post processing...
+        
         #mySvm.quad = manager.renderQuadInto(colortex=tex)
         self.quad.setShader(Shader.load(
                         Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps.glsl"))
         self.quad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(1))
         self.quad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(2))
         self.quad.setShaderInput("texGeoInfo2", self.buffer2.get_texture())
-        
+
+        #self.task_mgr.add(self.read_texture_data, "ReadTextureDataTask")
+    
         def GeneratePlaneNode(svmBase):
             #shader setting for SVM
             svmBase.planeShader = Shader.load(
@@ -218,7 +252,50 @@ class SurroundView(ShowBase):
         self.bufferViewer.setPosition("llcorner")
         self.bufferViewer.setCardSize(0.5, 0)
         self.accept("v", self.bufferViewer.toggleEnable)
+        
+    def read_texture_data(self, task):
+        # Wait for a frame to be rendered
+        #self.graphics_engine.render_frame()
 
+        if self.isPointCloudSetup == False:
+            return task.cont
+        
+        # Remove the RTM_bind_or_copy flag from the second texture
+        #self.tex3.set_render_to_texture(False)
+
+        # Add the RTM_copy_ram flag to the second texture
+        #self.buffer3.set_sort(1)
+        #self.buffer3.set_texture(self.tex3, True)
+
+        # Read the second texture back to RAM
+        tex_data = self.tex3.get_ram_image_as('RGBA')
+
+
+        # Read the texture data
+        tex = self.tex3
+        #self.texCopyBack.copy_from(tex)
+        #tex_data = tex.get_ram_image()
+
+        # Calculate the size of the texture data
+        tex_width = tex.get_x_size()
+        tex_height = tex.get_y_size()
+        tex_bpp = 4  # Assuming RGBA 8 bits each, so 4 bytes per pixel
+        tex_data_size = tex_width * tex_height * tex_bpp
+
+        np_tex_data = np.frombuffer(tex_data, dtype=np.uint32).reshape(tex_height, tex_width, 4)
+        print("*****************************>> {}".format(np.max(np_tex_data)))
+
+        # Convert the data into a PTAUchar array
+        #tex_data_array = p3d.PTAUchar.empty_array(tex_data_size)
+        #tex_data_array = p3d.PTAUchar.empty_array(tex_data.get_size())
+        #tex_data_array.set_subdata(0, tex_data)
+
+        # Do something with the data here, e.g., save it to a file or analyze it
+        # ...
+
+        # Continue reading the texture data each frame
+        return task.cont
+    
     def shaderRecompile(self):
         self.planeShader = Shader.load(
             Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps_plane.glsl")
