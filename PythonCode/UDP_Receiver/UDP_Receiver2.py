@@ -81,6 +81,8 @@ class SurroundView(ShowBase):
         self.buffer1.addRenderTexture(tex1, 
                                       p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram,
                                       p3d.GraphicsOutput.RTP_color)
+        # I dont know why the RTP_aux_rgba_x with RTM_copy_ram (F_rgba32i?!) affects incorrect render-to-texture result.
+        # so, tricky.. the tex2 only contains pos info (no need to readback to RAM)
         self.buffer1.addRenderTexture(tex2, #p3d.GraphicsOutput.RTM_bind_or_copy |  
                                       p3d.GraphicsOutput.RTM_bind_or_copy , 
                                       p3d.GraphicsOutput.RTP_aux_rgba_0)
