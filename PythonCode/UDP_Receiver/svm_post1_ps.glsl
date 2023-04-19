@@ -12,8 +12,8 @@ uniform mat4 matViewProj1;
 uniform mat4 matViewProj2;
 uniform mat4 matViewProj3;
 
-uniform usampler2D texGeoInfo0;
-uniform usampler2D texGeoInfo1;
+uniform isampler2D texGeoInfo0;
+uniform isampler2D texGeoInfo1;
 uniform sampler2D texGeoInfo2; // from sceneObj
 
 uniform sampler2DArray cameraImgs;
@@ -99,22 +99,24 @@ void main()
 
     // uintBitsToFloat
     const ivec2 texIdx2d = ivec2(l_texcoord0 * 1024);
-    uvec4 geoInfo0 = texelFetch(texGeoInfo0, texIdx2d, 0);
-    uvec4 geoInfo1 = texelFetch(texGeoInfo1, texIdx2d, 0);
+    ivec4 geoInfo0 = texelFetch(texGeoInfo0, texIdx2d, 0);
+    ivec4 geoInfo1 = texelFetch(texGeoInfo1, texIdx2d, 0);
     vec4 sceneColor = texelFetch(texGeoInfo2, texIdx2d, 0);
     
-    vec3 pos = uintBitsToFloat(geoInfo0.xyz);
-    uint count = geoInfo0.w;
-    uint semantic = geoInfo1.x;
-    uint camId0 = geoInfo1.y;
-    uint camId1 = geoInfo1.z;
+    vec3 pos = uintBitsToFloat(geoInfo1.xyz);
+    int count = geoInfo0.w;
+    int semantic = geoInfo0.x;
+    int camId0 = geoInfo0.y;
+    int camId1 = geoInfo0.z;
 
     vec4 colorOut = vec4(0, 0, 0, 1);
 #define MYDEBUG__
 #ifdef MYDEBUG__ 
-    /**/
+
+    /*
     if (count > 0) {
         switch(semantic) {
+            case 0 : colorOut = vec4(0, 1, 1, 1); break;
             case 1 : colorOut = vec4(0, 1, 0, 1); break;
             case 2 : colorOut = vec4(1, 0, 0, 1); break;
             case 3 : colorOut = vec4(0, 0, 1, 1); break;
@@ -123,10 +125,12 @@ void main()
     }
     /**/
     switch(count) {
+        case 0 : colorOut = vec4(0, 1, 1, 1); break;
         case 1 : colorOut = vec4(0, 1, 0, 1); break;
         case 2 : colorOut = vec4(1, 0, 0, 1); break;
         default : colorOut = vec4(1, 1, 1, 1); break;
     }/**/
+    //colorOut = vec4(camId0, camId1, 0, 1);
 #else
     
     // height correction

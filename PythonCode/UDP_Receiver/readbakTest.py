@@ -102,7 +102,6 @@ class MyApp(ShowBase):
         
         # Create a TexturePeeker for asynchronous texture transfer
         self.texture_peeker = None
-        self.peeker_ready = False
         
     def updatePreProcessShader(self, task):
         time = task.time
@@ -116,7 +115,7 @@ class MyApp(ShowBase):
         # Read the texture data into a PTAUchar
         tex_data = render_target.get_ram_image()
         
-        if not tex_data.is_null():
+        if True: #not tex_data.is_null():
             # Convert the PTAUchar to a NumPy array
             np_texture = np.frombuffer(tex_data, np.uint8)
             # Reshape the NumPy array to match the texture dimensions and number of channels

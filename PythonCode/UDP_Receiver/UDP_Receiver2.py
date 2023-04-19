@@ -46,53 +46,73 @@ class SurroundView(ShowBase):
         
         # Set up the offscreen buffer
         fb_props = p3d.FrameBufferProperties()
-        fb_props.setRgbColor(True)
+        #fb_props.setRgbColor(True)
         fb_props.set_rgba_bits(32, 32, 32, 32) 
-        fb_props.setAuxRgba(3)  # Set up one auxiliary buffer
+        fb_props.setAuxRgba(2)  # Set up one auxiliary buffer
         fb_props.setDepthBits(24)
 
         
-        self.buffer1 = self.win.makeTextureBuffer("buffer1", winSizeX, winSizeY, to_ram=True, fbp=fb_props)
-        #self.buffer1 = self.win.makeTextureBuffer("buffer1", winSizeX, winSizeY)
-        self.buffer1.setClearColor(p3d.Vec4(0, 0, 0, 1))
+        #self.buffer1 = self.win.makeTextureBuffer("buffer1", winSizeX, winSizeY, to_ram=True, fbp=fb_props)
+        self.buffer1 = self.graphics_engine.make_output(
+            self.pipe,
+            "offscreen buffer",
+            -20,
+            fb_props,
+            winprops,
+            p3d.GraphicsPipe.BF_refuse_window,
+            self.win.get_gsg(),
+            self.win
+        ) # DO NOT MAKE BUFFER via base.win.makeTextureBuffer for readback-purposed render target (F_rgba32)
+        # base.win.makeTextureBuffer create a default render target buffer (F_rgba)
+        self.buffer1.setClearColor(p3d.Vec4(0, 0, 0, 0))
         self.buffer1.setSort(10)
         
         # Create the render textures
         tex1 = p3d.Texture() # self.buffer1.getTexture() # 
         tex2 = p3d.Texture()
-        tex1.set_format(p3d.Texture.F_rgba32)
-        tex2.set_format(p3d.Texture.F_rgba32)
+        tex1.set_format(p3d.Texture.F_rgba32i)
+        tex2.set_format(p3d.Texture.F_rgba32i)
+        #tex1.set_component_type(p3d.Texture.T_unsigned_int)
+        #tex2.set_component_type(p3d.Texture.T_unsigned_int)
         tex1.setClearColor(p3d.Vec4(0, 0, 0, 0))
         tex2.setClearColor(p3d.Vec4(0, 0, 0, 0))
         tex1.clear()
         tex2.clear()
-        #tex1.setup2dTexture(winSizeX, winSizeY, p3d.Texture.T_int, p3d.Texture.F_rgba32)
-        #tex2.setup2dTexture(winSizeX, winSizeY, p3d.Texture.T_int, p3d.Texture.F_rgba32)
-
-        # RTM_bind_or_copy
-        self.buffer1.addRenderTexture(tex1, p3d.GraphicsOutput.RTM_bind_or_copy, p3d.GraphicsOutput.RTP_aux_rgba_0)
-        self.buffer1.addRenderTexture(tex2, p3d.GraphicsOutput.RTM_bind_or_copy, p3d.GraphicsOutput.RTP_aux_rgba_1)
-
-        #self.texCopyBack = p3d.Texture()
-        #self.texCopyBack.setup2dTexture(winSizeX, winSizeY, p3d.Texture.T_int, p3d.Texture.F_rgba32)
-
-        #cm = p3d.CardMaker("card")
-        #cm.setFrameFullscreenQuad()
-        #card = self.render2d.attachNewNode(cm.generate())
-        #card.setTexture(tex1)
-        
-        # Create a fullscreen quad to display the output
-        #cm = p3d.CardMaker("card")
-        #cm.setFrameFullscreenQuad()
-        #card = self.render2d.attachNewNode(cm.generate())
-        #card.setTexture(tex1)
+        self.buffer1.addRenderTexture(tex1, 
+                                      p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram,
+                                      p3d.GraphicsOutput.RTP_color)
+        self.buffer1.addRenderTexture(tex2, #p3d.GraphicsOutput.RTM_bind_or_copy |  
+                                      p3d.GraphicsOutput.RTM_bind_or_copy , 
+                                      p3d.GraphicsOutput.RTP_aux_rgba_0)
         
         # Set up the offscreen camera
         self.cam1 = self.makeCamera(self.buffer1, scene=self.renderSVM, lens=self.cam.node().getLens())
         self.cam1.reparentTo(self.cam)
 
         # Set up a buffer for the first pass
-        self.buffer2 = self.win.makeTextureBuffer("buffer2", winSizeX, winSizeY)
+        fb_props2 = p3d.FrameBufferProperties()
+        fb_props2.setRgbColor(True)
+        fb_props2.set_rgba_bits(8, 8, 8, 8) 
+        #fb_props2.setAuxRgba(1)  # Set up one auxiliary buffer
+        fb_props2.setDepthBits(24)
+        self.buffer2 = self.graphics_engine.make_output(
+            self.pipe,
+            "offscreen buffer2",
+            -1,
+            fb_props2,
+            winprops,
+            p3d.GraphicsPipe.BF_refuse_window,
+            self.win.get_gsg(),
+            self.win
+        )
+        #self.buffer2 = self.win.makeTextureBuffer("buffer2", winSizeX, winSizeY) # this includes a default render target RTP_color
+        texP0 = p3d.Texture() 
+        texP0.set_format(p3d.Texture.F_rgba)
+        texP0.set_component_type(p3d.Texture.T_unsigned_byte)
+        self.buffer2.addRenderTexture(texP0, 
+                                      p3d.GraphicsOutput.RTM_bind_or_copy,
+                                      p3d.GraphicsOutput.RTP_color)
+        
         self.buffer2.setClearColor(p3d.Vec4(0, 0, 0, 1))
         self.buffer2.setSort(0)
 
@@ -110,13 +130,11 @@ class SurroundView(ShowBase):
         center = (bbox[0] + bbox[1]) * 0.5
         self.boat.setPos(-bbox[0].z)
         self.boat.reparentTo(self.renderObj)
-        self.boat.setTag("ObjScene", "True")
         
         self.axis = self.loader.loadModel('zup-axis')
         self.axis.setPos(0, 0, 0)
         self.axis.setScale(100)
         self.axis.reparentTo(self.renderObj)
-        self.axis.setTag("ObjScene", "True")
         
         self.isPointCloudSetup = False
         self.lidarRes = 0
@@ -128,48 +146,15 @@ class SurroundView(ShowBase):
             Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
         self.sphere.setShader(self.sphereShader)
         self.sphere.reparentTo(self.renderObj)
-        self.sphere.setTag("ObjScene", "True")
-
-
-        
-        '''
-        # Set up the second offscreen buffer with RTM_copy_ram
-        self.buffer3 = self.win.makeTextureBuffer("buffer3", winSizeX, winSizeY, to_ram=True, fbp=fb_props)
-        
-        # Create a texture and add it to the second buffer
-        self.tex3 = p3d.Texture()
-        self.buffer3.add_render_texture(self.tex3, p3d.GraphicsOutput.RTM_copy_ram)
-
-        # Create a fullscreen quad
-        cm = p3d.CardMaker("quad3")
-        cm.set_frame_fullscreen_quad()
-        self.quad3 = self.render2d.attach_new_node(cm.generate())
-
-        # Set the first texture as the texture for the quad
-        self.quad3.set_texture(self.buffer1.getTexture(2))
-        
-        # Set up the camera to render to the second buffer
-        self.buffer_cam3 = self.make_camera(self.buffer3)
-        self.buffer_cam3.reparent_to(self.render2d)
-        '''
-
-
-        
-
 
         manager = FilterManager(self.win, self.cam)
-        #tex = p3d.Texture()
-        #tex.setup2dTexture(width, height, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
         self.quad = manager.renderSceneInto(colortex=None) # make dummy texture... for post processing...
-        
         #mySvm.quad = manager.renderQuadInto(colortex=tex)
         self.quad.setShader(Shader.load(
                         Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps.glsl"))
-        self.quad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(1))
-        self.quad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(2))
-        self.quad.setShaderInput("texGeoInfo2", self.buffer2.get_texture())
-
-        #self.task_mgr.add(self.read_texture_data, "ReadTextureDataTask")
+        self.quad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
+        self.quad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
+        self.quad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
     
         def GeneratePlaneNode(svmBase):
             #shader setting for SVM
@@ -238,62 +223,39 @@ class SurroundView(ShowBase):
 
         GeneratePlaneNode(self)
         self.plane.reparentTo(self.renderSVM)
-        self.plane.setTag("SvmScene", "True")
         self.accept('r', self.shaderRecompile)
-        
-        self.cam1.node().setInitialState(self.renderObj.getState())
-        self.cam1.node().setTagStateKey("ObjScene")
-        self.cam1.node().setTagState("True", self.renderObj.getState())
-
-        self.cam2.node().setInitialState(self.renderSVM.getState())
-        self.cam2.node().setTagStateKey("SvmScene")
-        self.cam2.node().setTagState("True", self.renderSVM.getState())
         
         self.bufferViewer.setPosition("llcorner")
         self.bufferViewer.setCardSize(0.5, 0)
         self.accept("v", self.bufferViewer.toggleEnable)
         
-    def read_texture_data(self, task):
-        # Wait for a frame to be rendered
-        #self.graphics_engine.render_frame()
-
-        if self.isPointCloudSetup == False:
-            return task.cont
+        self.taskMgr.add(self.readTextureData, "readTextureData")  
+        self.buffer1.set_active(False) 
+        self.buffer2.set_active(False)
         
-        # Remove the RTM_bind_or_copy flag from the second texture
-        #self.tex3.set_render_to_texture(False)
+    def readTextureData(self, task):
+        self.buffer1.set_active(True) 
+        self.buffer2.set_active(True)
+        self.win.set_active(False)
+        self.graphics_engine.render_frame()
 
-        # Add the RTM_copy_ram flag to the second texture
-        #self.buffer3.set_sort(1)
-        #self.buffer3.set_texture(self.tex3, True)
-
-        # Read the second texture back to RAM
-        tex_data = self.tex3.get_ram_image_as('RGBA')
-
-
-        # Read the texture data
-        tex = self.tex3
-        #self.texCopyBack.copy_from(tex)
-        #tex_data = tex.get_ram_image()
-
-        # Calculate the size of the texture data
-        tex_width = tex.get_x_size()
-        tex_height = tex.get_y_size()
-        tex_bpp = 4  # Assuming RGBA 8 bits each, so 4 bytes per pixel
-        tex_data_size = tex_width * tex_height * tex_bpp
-
-        np_tex_data = np.frombuffer(tex_data, dtype=np.uint32).reshape(tex_height, tex_width, 4)
-        print("*****************************>> {}".format(np.max(np_tex_data)))
-
-        # Convert the data into a PTAUchar array
-        #tex_data_array = p3d.PTAUchar.empty_array(tex_data_size)
-        #tex_data_array = p3d.PTAUchar.empty_array(tex_data.get_size())
-        #tex_data_array.set_subdata(0, tex_data)
-
-        # Do something with the data here, e.g., save it to a file or analyze it
-        # ...
-
-        # Continue reading the texture data each frame
+        # Get the render target texture
+        tex0 = self.buffer1.getTexture(0)
+        # Read the texture data into a PTAUchar
+        tex0_data = tex0.get_ram_image()
+        # Convert the PTAUchar to a NumPy array
+        np_texture0 = np.frombuffer(tex0_data, np.uint32)
+        # Reshape the NumPy array to match the texture dimensions and number of channels
+        np_texture0 = np_texture0.reshape((tex0.get_y_size(), tex0.get_x_size(), 4))
+        
+        # to do with array0, array1
+        array0 = np_texture0.copy()
+        tex0.setRamImage(array0)
+        self.quad.setShaderInput("texGeoInfo0", tex0)
+        
+        self.buffer1.set_active(False) 
+        self.buffer2.set_active(False)
+        self.win.set_active(True)
         return task.cont
     
     def shaderRecompile(self):

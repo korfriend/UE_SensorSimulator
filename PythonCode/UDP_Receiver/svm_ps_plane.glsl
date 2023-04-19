@@ -5,7 +5,7 @@
 //#extension GL_NV_texture_array
 const float PI = 3.14159265359;
 // fragment-pixel output color
-out vec4 p3d_FragColor;
+//out vec4 p3d_FragColor;
 
 // input from vertex shader
 in vec2 texcoord;
@@ -22,8 +22,8 @@ uniform vec4 camPositions[4];
 uniform sampler2DArray cameraImgs;
 uniform isampler2DArray semanticImgs;
 
-layout(location = 1) out uvec4 frag_color0;
-layout(location = 2) out uvec4 frag_color1;
+out uvec4 frag_color0;
+layout(location = 1) out uvec4 frag_color1;
 
 void main() {
     vec3 pos = worldcoord;
@@ -49,9 +49,8 @@ void main() {
         }
     }
 
-    p3d_FragColor = vec4(0, 0, 1, 1);
+    //p3d_FragColor = vec4(0, 0, 1, 1);
     
-    frag_color0 = uvec4(floatBitsToUint(pos), count);
-    //frag_color1 = uvec4(mapProp, overlapIndex[0], overlapIndex[1], 0);
-    frag_color1 = uvec4(0, 0, 3, 4);
+    frag_color0 = uvec4(mapProp, overlapIndex[0], overlapIndex[1], count);
+    frag_color1 = uvec4(floatBitsToUint(pos), 0);
 }
