@@ -36,17 +36,35 @@
 USTRUCT(BlueprintType)
 struct FLidarSensorOut
 {
-	GENERATED_BODY()
+	GENERATED_BODY()	
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		TArray<float> depthArrayOut;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)	
 		TArray<FColor> colorArrayOut;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		TArray<FLidarPointCloudPoint> lidarPointsOut;
 };
+USTRUCT(BlueprintType)
+struct FLidarSensorOut360
+{
+	GENERATED_BODY()
 
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<float> depthArrayOut360;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<FColor> colorArrayOutF;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<FColor> colorArrayOutL;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<FColor> colorArrayOutB;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<FColor> colorArrayOutR;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<FLidarPointCloudPoint> lidarPointsOut360;
+};
 USTRUCT(BlueprintType)
 struct FBytes
 {
@@ -58,8 +76,12 @@ public:
 };
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FAsyncDelegate, FLidarSensorOut, SensorOut);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FAsyncDelegate360, FLidarSensorOut360, SensorOut360);
+
+
 
 UCLASS()
+
 class USensorSimulatorBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_UCLASS_BODY()
@@ -91,5 +113,12 @@ class USensorSimulatorBPLibrary : public UBlueprintFunctionLibrary
 	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "CamInfoToBytes", Keywords = "Cam Matrix Array ,fov, aspect ratio  to Bytes Array"))
 		static void	CamInfoToBytes(const TArray<FMatrix>& camMat, const int fov, const float aspectRatio, TArray<uint8>& bytePackets);
 
+	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "LidarScan360", Keywords = "LidarSensorSimulator Async with scenecap as input"))
+		static void	LidarSensorAsyncScan360(const TArray<FLidarPointCloudPoint>& lidarPoints,
+			ULidarPointCloudComponent* lidarPointCloud, 
+			USceneCaptureComponent2D* sceneCaptureF, USceneCaptureComponent2D* sceneCaptureL,
+			USceneCaptureComponent2D* sceneCaptureB, USceneCaptureComponent2D* sceneCaptureR,
+			FAsyncDelegate360 Out, FLidarSensorOut360& sensorOut, const bool asyncScan = true,
+			const float vFovSDeg = -15.f, const float vFovEDeg = 15.f, const int lidarChannels = 32, const float hfovDeg = 90.f, const int lidarResolution = 100, const float lidarRange = 1000.f);
 };
 
