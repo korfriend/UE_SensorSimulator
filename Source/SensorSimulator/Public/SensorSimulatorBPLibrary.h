@@ -120,5 +120,11 @@ class USensorSimulatorBPLibrary : public UBlueprintFunctionLibrary
 			USceneCaptureComponent2D* sceneCaptureB, USceneCaptureComponent2D* sceneCaptureR,
 			FAsyncDelegate360 Out, FLidarSensorOut360& sensorOut, const bool asyncScan = true,
 			const float vFovSDeg = -15.f, const float vFovEDeg = 15.f, const int lidarChannels = 32, const float hfovDeg = 90.f, const int lidarResolution = 100, const float lidarRange = 1000.f);
+	
+	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "SensorOutToBytes360", Keywords = "SensorOut360 to Bytes Array"))
+		static void SensorOutToBytes360(const FLidarSensorOut360& lidarSensorOuts,
+			TArray<FBytes>& bytePackets, FString& bytesInfo, int& bytesPoints, int& bytesColorMap,
+			int& bytesDepthMap, const int packetBytes);
+
 };
 
