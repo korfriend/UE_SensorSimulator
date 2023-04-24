@@ -43,7 +43,8 @@ USensorSimulatorBPLibrary::USensorSimulatorBPLibrary(const FObjectInitializer& O
 
 }
 
-auto LidarScan = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPointCloudComponent* lidarPointCloud, USceneCaptureComponent2D* sceneCapture,
+auto LidarScan = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPointCloudComponent* lidarPointCloud,
+	USceneCaptureComponent2D* sceneCapture,
 	FAsyncDelegate Out, FLidarSensorOut& sensorOut,
 	const float vFovSDeg, const float vFovEDeg, const int lidarChannels, const float hfovDeg, const int lidarResolution, const float lidarRange)
 {
@@ -178,6 +179,224 @@ auto LidarScan = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPoin
 	//
 };
 
+auto LidarScan360 = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPointCloudComponent* lidarPointCloud,
+	USceneCaptureComponent2D* sceneCaptureF, USceneCaptureComponent2D* sceneCaptureL, USceneCaptureComponent2D*
+	sceneCaptureB, USceneCaptureComponent2D* sceneCaptureR,
+	FAsyncDelegate360 Out, FLidarSensorOut360& sensorOut360,
+	const float vFovSDeg, const float vFovEDeg, const int lidarChannels, const float hfovDeg, const int lidarResolution, const float lidarRange)
+{
+
+	FMinimalViewInfo viewInfoF;
+	FMinimalViewInfo viewInfoL;
+	FMinimalViewInfo viewInfoB;
+	FMinimalViewInfo viewInfoR;
+
+	sceneCaptureF->GetCameraView(0, viewInfoF);
+	sceneCaptureL->GetCameraView(0, viewInfoL);
+	sceneCaptureB->GetCameraView(0, viewInfoB);
+	sceneCaptureR->GetCameraView(0, viewInfoR);
+
+	UTextureRenderTarget2D* textureRTF = sceneCaptureF->TextureTarget;
+	UTextureRenderTarget2D* textureRTL = sceneCaptureL->TextureTarget;
+	UTextureRenderTarget2D* textureRTB = sceneCaptureB->TextureTarget;
+	UTextureRenderTarget2D* textureRTR = sceneCaptureR->TextureTarget;
+
+	float texWidth = (float)textureRTF->SizeX;
+	float texHeight = (float)textureRTF->SizeY;
+
+	FMatrix ViewMatrixF, ProjectionMatrixF, ViewProjectionMatrixF;
+	FMatrix ViewMatrixL, ProjectionMatrixL, ViewProjectionMatrixL;
+	FMatrix ViewMatrixB, ProjectionMatrixB, ViewProjectionMatrixB;
+	FMatrix ViewMatrixR, ProjectionMatrixR, ViewProjectionMatrixR;
+
+	UGameplayStatics::GetViewProjectionMatrix(viewInfoF, ViewMatrixF, ProjectionMatrixF, ViewProjectionMatrixF);
+	UGameplayStatics::GetViewProjectionMatrix(viewInfoL, ViewMatrixL, ProjectionMatrixL, ViewProjectionMatrixL);
+	UGameplayStatics::GetViewProjectionMatrix(viewInfoB, ViewMatrixB, ProjectionMatrixB, ViewProjectionMatrixB);
+	UGameplayStatics::GetViewProjectionMatrix(viewInfoR, ViewMatrixR, ProjectionMatrixR, ViewProjectionMatrixR);
+
+	auto RenderTargetResourceF = textureRTF->GameThread_GetRenderTargetResource();
+	auto RenderTargetResourceL = textureRTL->GameThread_GetRenderTargetResource();
+	auto RenderTargetResourceB = textureRTB->GameThread_GetRenderTargetResource();
+	auto RenderTargetResourceR = textureRTR->GameThread_GetRenderTargetResource();
+
+	TArray<FColor> bufferF , bufferL, bufferB, bufferR;
+	sensorOut360.colorArrayOutF.Init(FColor(), texWidth * texHeight);
+	sensorOut360.colorArrayOutL.Init(FColor(), texWidth* texHeight);
+	sensorOut360.colorArrayOutB.Init(FColor(), texWidth* texHeight);
+	sensorOut360.colorArrayOutR.Init(FColor(), texWidth* texHeight);
+
+	if (RenderTargetResourceF) {
+		RenderTargetResourceF->ReadPixels(bufferF);
+		sensorOut360.colorArrayOutF = bufferF;
+	}
+	if (RenderTargetResourceL) {
+		RenderTargetResourceL->ReadPixels(bufferL);
+		sensorOut360.colorArrayOutL = bufferL;
+	}
+	if (RenderTargetResourceB) {
+		RenderTargetResourceB->ReadPixels(bufferB);
+		sensorOut360.colorArrayOutB = bufferB;
+	}
+	if (RenderTargetResourceR) {
+		RenderTargetResourceR->ReadPixels(bufferR);
+		sensorOut360.colorArrayOutR = bufferR;
+	}
+
+	UWorld* currentWorld = lidarPointCloud->GetWorld();
+
+	if (currentWorld == nullptr) {
+		return;
+	}
+
+	sensorOut360.lidarPointsOut360 = lidarPoints; // copy data
+
+	FVector posLidarSensorWS = lidarPointCloud->GetComponentLocation();
+	FRotator rotLidarSensor2World = lidarPointCloud->GetComponentRotation();
+
+	const float deltaDeg = hfovDeg / (float)lidarResolution;
+
+	FCollisionObjectQueryParams targetObjTypes;
+	targetObjTypes.AddObjectTypesToQuery(ECC_WorldStatic);
+	targetObjTypes.AddObjectTypesToQuery(ECC_WorldDynamic);
+	targetObjTypes.AddObjectTypesToQuery(ECC_PhysicsBody);
+	targetObjTypes.AddObjectTypesToQuery(ECC_Vehicle);
+	targetObjTypes.AddObjectTypesToQuery(ECC_Destructible);
+
+	sensorOut360.depthArrayOut360.Init(-1.f, lidarChannels * lidarResolution);
+
+	const float vRotDelta = fabs(vFovEDeg - vFovSDeg) / std::max((lidarChannels - 1), 1);
+	for (int chIdx = 0; chIdx < lidarChannels; chIdx++) {
+
+		float vRotDeg = vFovSDeg + (float)chIdx * vRotDelta;
+		FVector dirStart = FVector(1.f, 0, 0).RotateAngleAxis(vRotDeg, FVector(0, -1, 0));
+		FVector posChannelStart = posLidarSensorWS;// +FVector(0, 0, 1.f) * channelInterval * (float)chIdx;
+
+		for (int x = 0; x < lidarResolution; x++) {
+			float rotDeg = deltaDeg * (float)x - hfovDeg * 0.5f;
+			FVector vecRot = dirStart.RotateAngleAxis(rotDeg, FVector(0, 0, 1));
+			FVector dirVec = rotLidarSensor2World.RotateVector(vecRot);
+			FVector posChannelEnd = posChannelStart + dirVec * lidarRange;
+
+			// LineTrace
+			FHitResult outHit;
+			if (currentWorld->LineTraceSingleByObjectType(outHit, posChannelStart, posChannelEnd, targetObjTypes)) {
+				FVector3f hitPosition = FVector3f(vecRot * outHit.Distance);
+
+				// to do //
+				if (RenderTargetResourceF) {
+					FVector3f hitPositionWS = FVector3f(outHit.Location);
+					FPlane psPlane = ViewProjectionMatrixF.TransformFVector4(FVector4(hitPositionWS, 1.f));
+					float NormalizedX = (psPlane.X / (psPlane.W * 2.f)) + 0.5f;
+					float NormalizedY = 1.f - (psPlane.Y / (psPlane.W * 2.f)) - 0.5f;
+					FVector2D ScreenPos = FVector2D(NormalizedX * texWidth, NormalizedY * texHeight);
+					int sx = (int)ScreenPos.X;
+					int sy = (int)ScreenPos.Y;
+					FColor color(0, 255, 0, 255);
+					if (sx >= 0 && sx < texWidth && sy >= 0 && sy < texHeight && psPlane.Z / psPlane.W > 0) {
+						color = bufferF[sx + sy * texWidth];
+						FLidarPointCloudPoint pcPoint(hitPosition, color, true, 0);
+						sensorOut360.lidarPointsOut360.Add(pcPoint);
+					}
+				}
+				if(RenderTargetResourceL) {
+					FVector3f hitPositionWS = FVector3f(outHit.Location);
+					FPlane psPlane = ViewProjectionMatrixL.TransformFVector4(FVector4(hitPositionWS, 1.f));
+					float NormalizedX = (psPlane.X / (psPlane.W * 2.f)) + 0.5f;
+					float NormalizedY = 1.f - (psPlane.Y / (psPlane.W * 2.f)) - 0.5f;
+					FVector2D ScreenPos = FVector2D(NormalizedX * texWidth, NormalizedY * texHeight);
+					int sx = (int)ScreenPos.X;
+					int sy = (int)ScreenPos.Y;
+					FColor color(255, 0, 0, 255);
+					if (sx >= 0 && sx < texWidth && sy >= 0 && sy < texHeight && psPlane.Z / psPlane.W > 0) {
+						color = bufferL[sx + sy * texWidth];
+						FLidarPointCloudPoint pcPoint(hitPosition, color, true, 0);
+						sensorOut360.lidarPointsOut360.Add(pcPoint);
+					}
+				}
+				if (RenderTargetResourceB) {
+					FVector3f hitPositionWS = FVector3f(outHit.Location);
+					FPlane psPlane = ViewProjectionMatrixB.TransformFVector4(FVector4(hitPositionWS, 1.f));
+					float NormalizedX = (psPlane.X / (psPlane.W * 2.f)) + 0.5f;
+					float NormalizedY = 1.f - (psPlane.Y / (psPlane.W * 2.f)) - 0.5f;
+					FVector2D ScreenPos = FVector2D(NormalizedX * texWidth, NormalizedY * texHeight);
+					int sx = (int)ScreenPos.X;
+					int sy = (int)ScreenPos.Y;
+					FColor color(0, 0, 255, 255);
+					if (sx >= 0 && sx < texWidth && sy >= 0 && sy < texHeight && psPlane.Z / psPlane.W > 0) {
+						color = bufferB[sx + sy * texWidth];
+						FLidarPointCloudPoint pcPoint(hitPosition, color, true, 0);
+						sensorOut360.lidarPointsOut360.Add(pcPoint);
+					}
+				}
+				if (RenderTargetResourceR) {
+					FVector3f hitPositionWS = FVector3f(outHit.Location);
+					FPlane psPlane = ViewProjectionMatrixR.TransformFVector4(FVector4(hitPositionWS, 1.f));
+					float NormalizedX = (psPlane.X / (psPlane.W * 2.f)) + 0.5f;
+					float NormalizedY = 1.f - (psPlane.Y / (psPlane.W * 2.f)) - 0.5f;
+					FVector2D ScreenPos = FVector2D(NormalizedX * texWidth, NormalizedY * texHeight);
+					int sx = (int)ScreenPos.X;
+					int sy = (int)ScreenPos.Y;
+					FColor color(0, 255, 255, 255);
+					if (sx >= 0 && sx < texWidth && sy >= 0 && sy < texHeight && psPlane.Z / psPlane.W > 0) {
+						color = bufferR[sx + sy * texWidth];
+						FLidarPointCloudPoint pcPoint(hitPosition, color, true, 0);
+						sensorOut360.lidarPointsOut360.Add(pcPoint);
+					}
+				}
+		/*		else {
+					FLidarPointCloudPoint pcPoint(hitPosition);
+					sensorOut360.lidarPointsOut360.Add(pcPoint);
+				}*/
+
+				sensorOut360.depthArrayOut360[x + chIdx * lidarResolution] = FVector::Dist(posChannelStart, FVector(hitPosition));
+			}
+		}
+	}
+	lidarPointCloud->GetPointCloud()->SetData(sensorOut360.lidarPointsOut360);
+
+	mapCompleted[sceneCaptureF] = true;
+
+	AsyncTask(ENamedThreads::GameThread, [Out, &sensorOut360]()
+		{
+			if (Out.IsBound()) {
+				Out.Execute(sensorOut360);
+			}
+		}
+	);
+};
+void USensorSimulatorBPLibrary::LidarSensorAsyncScan360(
+	const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPointCloudComponent* lidarPointCloud, 
+	USceneCaptureComponent2D* sceneCaptureF, USceneCaptureComponent2D* sceneCaptureL, 
+	USceneCaptureComponent2D* sceneCaptureB, USceneCaptureComponent2D* sceneCaptureR,
+	FAsyncDelegate360 Out, FLidarSensorOut360& sensorOut, const bool asyncScan,
+	const float vFovSDeg, const float vFovEDeg, const int lidarChannels, const float hfovDeg, 
+	const int lidarResolution, const float lidarRange)
+{
+	if (mapCompleted.find(sceneCaptureF) == mapCompleted.end())
+		mapCompleted[sceneCaptureF] = true;
+	if (!mapCompleted[sceneCaptureF]) {
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Wait..."));
+		return;
+	}
+	mapCompleted[sceneCaptureF] = false;
+
+	if (asyncScan) {
+		// Schedule a thread
+		// Pass in our parameters to the lambda expression
+		// note that those parameters from the main thread can be released out during this async process
+		// pointer parameters are safe because they are conservative
+		//AsyncTask(ENamedThreads::GameThread, [&lidarPoints, lidarPointCloud, sceneCaptureF,
+		//	Out, &sensorOut, asyncScan, vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange]() { // AnyHiPriThreadNormalTask
+		//		LidarScan360(lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL, sceneCaptureB, sceneCaptureR, Out, sensorOut,
+		//		vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange);
+		//	});
+	}
+	else {
+		LidarScan360(lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL,sceneCaptureB,sceneCaptureR, Out, sensorOut,
+			vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange);
+	}
+}
+
 void USensorSimulatorBPLibrary::LidarSensorAsyncScan4(
 	const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPointCloudComponent* lidarPointCloud, USceneCaptureComponent2D* sceneCapture,
 	FAsyncDelegate Out, FLidarSensorOut& sensorOut, const bool asyncScan,
@@ -199,7 +418,7 @@ void USensorSimulatorBPLibrary::LidarSensorAsyncScan4(
 		// pointer parameters are safe because they are conservative
 		AsyncTask(ENamedThreads::GameThread, [&lidarPoints, lidarPointCloud, sceneCapture, Out, &sensorOut, asyncScan, vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange]() { // AnyHiPriThreadNormalTask
 			LidarScan(lidarPoints, lidarPointCloud, sceneCapture, Out, sensorOut,
-				vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange);
+			vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange);
 			});
 	}
 	else {
@@ -207,6 +426,9 @@ void USensorSimulatorBPLibrary::LidarSensorAsyncScan4(
 			vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange);
 	}
 }
+
+
+
 
 void USensorSimulatorBPLibrary::ReadSemantic(USceneCaptureComponent2D* sceneCapture, TArray<FColor>& semanticArrayOut) {
 	UTextureRenderTarget2D* textureRT = sceneCapture->TextureTarget;
@@ -293,6 +515,105 @@ void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& 
 	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Yellow, FString::FromInt(remainingBytes));
 	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Green, FString::FromInt(offset));
 }
+
+
+
+void USensorSimulatorBPLibrary::SensorOutToBytes360(const FLidarSensorOut360 & lidarSensorOuts,
+	TArray<FBytes>& bytePackets, FString& bytesInfo, int& bytesPoints, int& bytesColorMap,
+	int& bytesDepthMap, const int packetBytes)
+{
+	// compute array size
+	bytesPoints = 0;
+	bytesColorMap = 0;
+	bytesDepthMap = 0;
+
+	int index = 0;
+
+	if (lidarSensorOuts.lidarPointsOut360.Num() > 0) {
+		bytesPoints += lidarSensorOuts.lidarPointsOut360.Num() * 4 * 4 + 4;
+		bytesInfo += FString("Point") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.lidarPointsOut360.Num()) + FString("//");
+	}
+	if (lidarSensorOuts.depthArrayOut360.Num() > 0) {
+		bytesDepthMap += lidarSensorOuts.depthArrayOut360.Num() * 4;
+		bytesInfo += FString("Depth") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.depthArrayOut360.Num()) + FString("//");
+	}
+	if (lidarSensorOuts.colorArrayOutF.Num() > 0) {
+		bytesColorMap += lidarSensorOuts.colorArrayOutF.Num() * 4;
+		bytesInfo += FString("ColorF") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.colorArrayOutF.Num()) + FString("//");
+	}
+	if (lidarSensorOuts.colorArrayOutB.Num() > 0) {
+		bytesColorMap += lidarSensorOuts.colorArrayOutB.Num() * 4;
+		bytesInfo += FString("ColorB") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.colorArrayOutB.Num()) + FString("//");
+	}
+	if (lidarSensorOuts.colorArrayOutR.Num() > 0) {
+		bytesColorMap += lidarSensorOuts.colorArrayOutR.Num() * 4;
+		bytesInfo += FString("ColorR") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.colorArrayOutR.Num()) + FString("//");
+	}
+	if (lidarSensorOuts.colorArrayOutL.Num() > 0) {
+		bytesColorMap += lidarSensorOuts.colorArrayOutL.Num() * 4;
+		bytesInfo += FString("ColorL") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.colorArrayOutL.Num()) + FString("//");
+	}
+
+	uint32 bytesCount = bytesPoints + bytesColorMap * 4 + bytesDepthMap;
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, FString::FromInt(bytesCount));
+	TArray<uint8> bytes;
+	bytes.Init(0, bytesCount);
+	uint32 offsetPoints = 0, offsetColorMap = 0, offsetDepthMap = 0;
+
+	if (lidarSensorOuts.lidarPointsOut360.Num() > 0) {
+		*(int*)&bytes[offsetPoints] = lidarSensorOuts.lidarPointsOut360.Num();
+		offsetPoints += 4;
+		for (const FLidarPointCloudPoint& pp : lidarSensorOuts.lidarPointsOut360) {
+			memcpy(&bytes[offsetPoints], &(pp.Location), 4 * 3);
+			offsetPoints += 12;
+			memcpy(&bytes[offsetPoints], &(pp.Color.DWColor()), 4);
+			offsetPoints += 4;
+		}
+	}
+	if (lidarSensorOuts.depthArrayOut360.Num() > 0) {
+		memcpy(&bytes[offsetDepthMap + bytesPoints], &lidarSensorOuts.depthArrayOut360[0], lidarSensorOuts.depthArrayOut360.Num() * 4);
+		offsetDepthMap += lidarSensorOuts.depthArrayOut360.Num() * 4;
+	}
+	if (lidarSensorOuts.colorArrayOutF.Num() > 0) {
+		memcpy(&bytes[offsetColorMap + bytesPoints + bytesDepthMap], &lidarSensorOuts.colorArrayOutF[0], lidarSensorOuts.colorArrayOutF.Num() * 4);
+		offsetColorMap += lidarSensorOuts.colorArrayOutF.Num() * 4;
+	}
+	if (lidarSensorOuts.colorArrayOutB.Num() > 0) {
+		memcpy(&bytes[offsetColorMap + bytesPoints + bytesDepthMap], &lidarSensorOuts.colorArrayOutB[0], lidarSensorOuts.colorArrayOutB.Num() * 4);
+		offsetColorMap += lidarSensorOuts.colorArrayOutB.Num() * 4;
+	}
+	if (lidarSensorOuts.colorArrayOutR.Num() > 0) {
+		memcpy(&bytes[offsetColorMap + bytesPoints + bytesDepthMap], &lidarSensorOuts.colorArrayOutR[0], lidarSensorOuts.colorArrayOutR.Num() * 4);
+		offsetColorMap += lidarSensorOuts.colorArrayOutR.Num() * 4;
+	}
+	if (lidarSensorOuts.colorArrayOutL.Num() > 0) {
+		memcpy(&bytes[offsetColorMap + bytesPoints + bytesDepthMap], &lidarSensorOuts.colorArrayOutL[0], lidarSensorOuts.colorArrayOutL.Num() * 4);
+		offsetColorMap += lidarSensorOuts.colorArrayOutL.Num() * 4;
+	}
+	//off set 더해주면서 이동
+
+	//TArray<TArray<uint8>> bytePackets;
+	int numPackets = (int)ceil((float)bytesCount / (float)packetBytes);
+	bytePackets.Init(FBytes(), numPackets);
+	int remainingBytes = bytesCount;
+	int offset = 0;
+	int packetIndex = 0;
+	for (FBytes& packet : bytePackets) {
+		int packetSize = std::min(packetBytes, remainingBytes);
+		packet.ArrayOut.Init(0, packetSize + 4);
+		*(int*)&packet.ArrayOut[0] = packetIndex++;
+		memcpy(&packet.ArrayOut[4], &bytes[offset], packetSize);
+
+		remainingBytes -= packetSize;
+		offset += packetSize;
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::FromInt(packetSize));
+	}
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::FromInt(packetBytes));
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Yellow, FString::FromInt(remainingBytes));
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Green, FString::FromInt(offset));
+}
+
+
 
 void USensorSimulatorBPLibrary::IntToBytes(const int fromInt, TArray <uint8>& bytes)
 {
