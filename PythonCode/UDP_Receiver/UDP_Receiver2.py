@@ -368,10 +368,11 @@ print("UDP server up and listening")
 
 mySvm.isInitializedUDP = True
 
-color_map = [(128, 64,128),
-             (244, 35,232),
-             ( 70, 70, 70),
-             (102,102,156),
+color_map = [(50, 50, 50),
+             (130, 120, 110),
+             (255, 35, 35),
+             ( 35, 255, 35),
+             (35,35,255),
              (190,153,153),
              (153,153,153),
              (250,170, 30),
@@ -686,18 +687,28 @@ def ProcSvmFromPackets(base, fullPackets, packetNum,
         base.planeTexArray.setRamImage(cameraArray)
         base.semanticTexArray.setRamImage(semanticArray1_2)
 
-    cv.imshow('image_deirvlon 0', imgs[0])
-    cv.imshow('image_deirvlon 1', imgs[1])
-    cv.imshow('image_deirvlon 2', imgs[2])
-    cv.imshow('image_deirvlon 3', imgs[3])
+    cv.imshow('rgb 0', imgs[0])
+    cv.imshow('rgb 1', imgs[1])
+    cv.imshow('rgb 2', imgs[2])
+    cv.imshow('rgb 3', imgs[3])
+    cv.moveWindow('rgb 0', 100, 100)
+    cv.moveWindow('rgb 1', 610, 100)
+    cv.moveWindow('rgb 2', 1120, 100)
+    cv.moveWindow('rgb 3', 1630, 100)
     if isCustomImgs:
-        cv.imshow("semantic_deirvlon 0", semantics[0])
-        cv.imshow("semantic_deirvlon 1", semantics[1])
-        cv.imshow("semantic_deirvlon 2", semantics[2])
-        cv.imshow("semantic_deirvlon 3", semantics[3])
+        cv.imshow("semantic 0", semantics[0])
+        cv.imshow("semantic 1", semantics[1])
+        cv.imshow("semantic 2", semantics[2])
+        cv.imshow("semantic 3", semantics[3])
+        cv.moveWindow("semantic 0", 100, 460)
+        cv.moveWindow("semantic 1", 610, 460)
+        cv.moveWindow("semantic 2", 1120, 460)
+        cv.moveWindow("semantic 3", 1630, 460)
+        
+        
     cv.waitKey(1)
     
-timeout = 1
+timeout = 5
 UDPServerSocket.settimeout(timeout)
 def ReceiveData():
     # Listen for incoming datagrams
