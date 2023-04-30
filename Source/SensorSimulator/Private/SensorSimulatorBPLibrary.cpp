@@ -385,11 +385,11 @@ void USensorSimulatorBPLibrary::LidarSensorAsyncScan360(
 		// Pass in our parameters to the lambda expression
 		// note that those parameters from the main thread can be released out during this async process
 		// pointer parameters are safe because they are conservative
-		//AsyncTask(ENamedThreads::GameThread, [&lidarPoints, lidarPointCloud, sceneCaptureF,
-		//	Out, &sensorOut, asyncScan, vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange]() { // AnyHiPriThreadNormalTask
-		//		LidarScan360(lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL, sceneCaptureB, sceneCaptureR, Out, sensorOut,
-		//		vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange);
-		//	});
+		AsyncTask(ENamedThreads::GameThread, [&lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL, sceneCaptureB, sceneCaptureR,
+			Out, &sensorOut, asyncScan, vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange]() { // AnyHiPriThreadNormalTask
+				LidarScan360(lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL, sceneCaptureB, sceneCaptureR, Out, sensorOut,
+				vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange);
+			});
 	}
 	else {
 		LidarScan360(lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL,sceneCaptureB,sceneCaptureR, Out, sensorOut,
