@@ -110,20 +110,19 @@ void main()
     int camId1 = geoInfo0.z;
 
     vec4 colorOut = vec4(0, 0, 0, 1);
-#define MYDEBUG__
+//#define MYDEBUG__
 #ifdef MYDEBUG__ 
-
-    /*
+    
     if (count > 0) {
         switch(semantic) {
-            case 0 : colorOut = vec4(0, 1, 1, 1); break;
-            case 1 : colorOut = vec4(0, 1, 0, 1); break;
-            case 2 : colorOut = vec4(1, 0, 0, 1); break;
-            case 3 : colorOut = vec4(0, 0, 1, 1); break;
-            default : colorOut = vec4(1, 1, 1, 1); break;
+            case 1 : colorOut.bgra = vec4(130.0/255.0, 120.0/255.0, 110.0/255.0, 1); break;
+            case 2 : colorOut.bgra = vec4(255.0/255.0, 35.0/255.0, 35.0/255.0, 1); break;
+            case 3 : colorOut.bgra = vec4( 35.0/255.0, 255.0/255.0, 35.0/255.0, 1); break;
+            case 4 : colorOut.bgra = vec4(35.0/255.0,35.0/255.0,255.0/255.0, 1); break;
+            default : colorOut = vec4(0, 0, 0, 1); break;
         }
     }
-    /**/
+    /*
     switch(count) {
         case 0 : colorOut = vec4(0, 1, 1, 1); break;
         case 1 : colorOut = vec4(0, 1, 0, 1); break;
@@ -135,8 +134,9 @@ void main()
     
     // height correction
     switch (semantic) {
-        case 2: pos.z = 25; break;
-        case 3: pos.z = 0; break;
+        case 2: pos.z = 0; break;
+        case 3: pos.z = 50; break;
+        case 4: pos.z = 99.0; break;
     }
 
     int overlapIndex[4] = {int(camId0), int(camId1), 0, 0};
@@ -168,8 +168,8 @@ void main()
             // TO DO : determine dynamic blending weights
             float w01 = 0.5;
             float w12 = 0.5;
-            float w23 = 0.9;
-            float w30 = 0.1;
+            float w23 = 0.5;
+            float w30 = 0.5;
             switch(enc) {
                 case 1: {
                     colorOut = blendArea(0, 1, pos, viewProjs, enc, w01, debugMode);
