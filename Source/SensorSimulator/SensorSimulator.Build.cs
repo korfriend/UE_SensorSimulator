@@ -27,13 +27,14 @@ public class SensorSimulator : ModuleRules
 			{
 				"Core",
                 "Engine",
+                //"LogTemp",
 				// ... add other public dependencies that you statically link with here ...
 				"LidarPointCloudRuntime",
 			}
 			);
-			
-		
-		PrivateDependencyModuleNames.AddRange(
+
+
+        PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
 				"CoreUObject",
