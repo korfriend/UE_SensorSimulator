@@ -1,6 +1,6 @@
 {
-    "packetNum": 83,
-    "bytesPoints": 78240,
+    "packetNum": 82,
+    "bytesPoints": 50512,
     "bytesDepthmap": 51200,
     "bytesRGBmap": 4800000,
     "numLidars": 4,
