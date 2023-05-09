@@ -554,41 +554,33 @@ void USensorSimulatorBPLibrary::SensorOutToBytes360(const FLidarSensorOut360 & l
 	}
 
 	//uint32 bytesCount = bytesPoints + bytesColorMap * 4 + bytesDepthMap;
-	uint32 bytesCount = bytesColorMap * 4 + bytesDepthMap;
+	//uint32 bytesCount = bytesColorMap * 4 + bytesDepthMap;
+	uint32 bytesCount = bytesColorMap + bytesDepthMap;
 
 	TArray<uint8> bytes;
 	bytes.Init(0, bytesCount);
 	//uint32 offsetPoints = 0, offsetColorMap = 0, offsetDepthMap = 0;
 	uint32 offsetColorMap = 0, offsetDepthMap = 0;
 
-	/*if (lidarSensorOuts.lidarPointsOut360.Num() > 0) {
-		*(int*)&bytes[offsetPoints] = lidarSensorOuts.lidarPointsOut360.Num();
-		offsetPoints += 4;
-		for (const FLidarPointCloudPoint& pp : lidarSensorOuts.lidarPointsOut360) {
-			memcpy(&bytes[offsetPoints], &(pp.Location), 4 * 3);
-			offsetPoints += 12;
-			memcpy(&bytes[offsetPoints], &(pp.Color.DWColor()), 4);
-			offsetPoints += 4;
-		}
-	}*/
 	if (lidarSensorOuts.depthArrayOut360.Num() > 0) {
-		memcpy(&bytes[offsetDepthMap + bytesPoints], &lidarSensorOuts.depthArrayOut360[0], lidarSensorOuts.depthArrayOut360.Num() * 4);
+		memcpy(&bytes[offsetDepthMap], &lidarSensorOuts.depthArrayOut360[0], lidarSensorOuts.depthArrayOut360.Num() * 4);
 		offsetDepthMap += lidarSensorOuts.depthArrayOut360.Num() * 4;
+		//offsetColorMap += offsetDepthMap; //my
 	}
 	if (lidarSensorOuts.colorArrayOutF.Num() > 0) {
-		memcpy(&bytes[offsetColorMap + bytesPoints + bytesDepthMap], &lidarSensorOuts.colorArrayOutF[0], lidarSensorOuts.colorArrayOutF.Num() * 4);
+		memcpy(&bytes[offsetColorMap + bytesDepthMap], &lidarSensorOuts.colorArrayOutF[0], lidarSensorOuts.colorArrayOutF.Num() * 4);
 		offsetColorMap += lidarSensorOuts.colorArrayOutF.Num() * 4;
 	}
 	if (lidarSensorOuts.colorArrayOutB.Num() > 0) {
-		memcpy(&bytes[offsetColorMap + bytesPoints + bytesDepthMap], &lidarSensorOuts.colorArrayOutB[0], lidarSensorOuts.colorArrayOutB.Num() * 4);
+		memcpy(&bytes[offsetColorMap + bytesDepthMap], &lidarSensorOuts.colorArrayOutB[0], lidarSensorOuts.colorArrayOutB.Num() * 4);
 		offsetColorMap += lidarSensorOuts.colorArrayOutB.Num() * 4;
 	}
 	if (lidarSensorOuts.colorArrayOutR.Num() > 0) {
-		memcpy(&bytes[offsetColorMap + bytesPoints + bytesDepthMap], &lidarSensorOuts.colorArrayOutR[0], lidarSensorOuts.colorArrayOutR.Num() * 4);
+		memcpy(&bytes[offsetColorMap + bytesDepthMap], &lidarSensorOuts.colorArrayOutR[0], lidarSensorOuts.colorArrayOutR.Num() * 4);
 		offsetColorMap += lidarSensorOuts.colorArrayOutR.Num() * 4;
 	}
 	if (lidarSensorOuts.colorArrayOutL.Num() > 0) {
-		memcpy(&bytes[offsetColorMap + bytesPoints + bytesDepthMap], &lidarSensorOuts.colorArrayOutL[0], lidarSensorOuts.colorArrayOutL.Num() * 4);
+		memcpy(&bytes[offsetColorMap + bytesDepthMap], &lidarSensorOuts.colorArrayOutL[0], lidarSensorOuts.colorArrayOutL.Num() * 4);
 		offsetColorMap += lidarSensorOuts.colorArrayOutL.Num() * 4;
 	}
 	//off set 더해주면서 이동
