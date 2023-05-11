@@ -1,8 +1,19 @@
 import socket
-from multiprocessing import Queue
+import queue
+import numpy as np
+import time
 
+def ReceiveData(packetInit: dict, q: queue):
+    localIP = "127.0.0.1"
+    localPort = 12000
+    bufferSize = 60000
 
-def ReceiveData(UDPServerSocket: socket.socket, bufferSize: int, packetInit: dict, q: Queue):
+    UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+
+    UDPServerSocket.bind((localIP, localPort))
+    # timeout = 5
+    # UDPServerSocket.settimeout(timeout)
+    
     packetDict = {}
 
     while True:
@@ -41,49 +52,20 @@ def ReceiveData(UDPServerSocket: socket.socket, bufferSize: int, packetInit: dic
             if frame not in packetDict:
                 packetDict[frame] = {}
             packetDict[frame][count] = packet[8:]
-            if len(packetDict[frame]) == packetInit["packetNum"]:
-                fullPackets = b"".join([packetDict[frame][i] for i in range(packetInit["packetNum"])])
-                q.put(fullPackets)
-
-            # fullPackets = bytearray(b"")
-            # packetIndex = 0
-            # while packetIndex < packetNum:
-            #     bytesAddressPair = UDPServerSocket.recvfrom(bufferSize)
-            #     packet = bytesAddressPair[0]
-            #     index = int.from_bytes(packet[0:4], "little")
-            #     #if index != packetIndex:
-            #         # print(("Error {id}").format(id=index))
-            #     packetIndex += 1
-            #     fullPackets += packet[4:]
-
-            # offsetPoints = 0
-
-            # offsetPoints += 4
-            # pX = struct.unpack("<f", fullPackets[0 + offsetPoints : 4 + offsetPoints])[0]
-            # pY = struct.unpack("<f", fullPackets[4 + offsetPoints : 8 + offsetPoints])[0]
-            # pZ = struct.unpack("<f", fullPackets[8 + offsetPoints : 12 + offsetPoints])[0]
-            # cR = int.from_bytes(fullPackets[12 + offsetPoints : 13 + offsetPoints], "little")
-            # cG = int.from_bytes(fullPackets[13 + offsetPoints : 14 + offsetPoints], "little")
-            # cB = int.from_bytes(fullPackets[14 + offsetPoints : 15 + offsetPoints], "little")
-            # cA = int.from_bytes(fullPackets[15 + offsetPoints : 16 + offsetPoints], "little")
-            # # print(pX, pY, pZ)
-
-            # offsetPoints += 16
-
-            # offsetColor = bytesPoints + bytesDepthmap
-            # imgBytes = imageWidth * imageHeight * 4
-            # imgs = []
-
-            # for i in range(4):
-            #     imgnp = np.array(
-            #         fullPackets[offsetColor + imgBytes * i : offsetColor + imgBytes * (i + 1)], dtype=np.uint8
-            #     )
-            #     imgnp = imgnp.reshape((imageWidth, imageHeight, 4))
-            #     imgs.append(imgnp)
-
-            # cv.imshow("image_deirvlon 0", imgs[0])
-            # cv.imshow("image_deirvlon 1", imgs[1])
-            # cv.imshow("image_deirvlon 2", imgs[2])
-            # cv.imshow("image_deirvlon 3", imgs[3])
-
-            # cv.waitKey(1)
+            #print("count sum : ", len(packetDict[frame]))
+            for key in list(packetDict.keys()):
+                if len(packetDict[key]) == packetInit["packetNum"]:
+                    fullPackets = b"".join([packetDict[frame][i] for i in range(packetInit["packetNum"])])
+                    #print("queue size : ", q.qsize())
+                    if q.qsize() > 9 :
+                        q.get()
+                    #print(frame)
+                    #print("dic len defor : " , len(packetDict))
+                    #print("send : ", key)
+                    q.put(np.array([key], dtype=np.int32).tobytes() + fullPackets)
+                    del packetDict[key]
+                    #print("dic len after : " , len(packetDict))
+                    time.sleep(0.003)
+                #else : 
+                    # no full packet
+                    #continue
