@@ -11,9 +11,10 @@ def ReceiveData(packetInit: dict, q: queue):
     UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 
     UDPServerSocket.bind((localIP, localPort))
- 
+    # timeout = 5
+    # UDPServerSocket.settimeout(timeout)
+    
     packetDict = {}
-    packetInit["packetNum"] =71 
 
     while True:
         bytesAddressPair = UDPServerSocket.recvfrom(bufferSize)
@@ -59,12 +60,12 @@ def ReceiveData(packetInit: dict, q: queue):
                     if q.qsize() > 9 :
                         q.get()
                     #print(frame)
-                    print("dic len defor : " , len(packetDict))
-                    print("send : ", key)
+                    #print("dic len defor : " , len(packetDict))
+                    #print("send : ", key)
                     q.put(np.array([key], dtype=np.int32).tobytes() + fullPackets)
                     del packetDict[key]
-                    print("dic len after : " , len(packetDict))
-                    time.sleep(0.001)
+                    #print("dic len after : " , len(packetDict))
+                    time.sleep(0.003)
                 #else : 
                     # no full packet
                     #continue
