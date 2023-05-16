@@ -250,6 +250,9 @@ class SurroundView(ShowBase):
             svmBase.quad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
             svmBase.sphere.setShaderInput('semanticImgs', svmBase.semanticTexArray)
 
+            zeros = np.ones((4, 256, 256), dtype=np.int32)
+            svmBase.semanticTexArray.setRamImage(zeros)
+
         GeneratePlaneNode(self)
         self.plane.reparentTo(self.renderSVM)
         self.accept('r', self.shaderRecompile)
@@ -356,6 +359,7 @@ def GeneratePointNode():
     svmBase.isPointCloudSetup = True
 
 def UpdateResource(task):
+    PacketProcessing(mySvm.packetInit, mySvm.qQ)
     return task.cont
 
 def InitSVM(base,
@@ -492,20 +496,19 @@ def InitSVM(base,
 
     base.sensorMatLHS_array = sensorMatLHS_array
     print("Texture Initialized!")
-    
-    zeros = np.ones((4, 256, 256), dtype=np.int32)
-    base.semanticTexArray.setRamImage(zeros)
-
 
 def ProcSvmFromPackets(base,
                        numLidars, lidarRes, lidarChs, 
                        imageWidth, imageHeight, imgs, worldpointlist):
     
+    #imgs = np.array(imgs)
+    #base.planeTexArray.setRamImage(imgs)
+    #time.sleep(0.01)
+
     InitSVM(base,
             numLidars, lidarRes, lidarChs, 
             imageWidth, imageHeight, imgs, worldpointlist)
     
-
     #print("Point Clout Update!!")
     # point cloud buffer : fullPackets[0:bytesPoints]
     numMaxPoints = lidarRes * lidarChs * numLidars
@@ -581,8 +584,6 @@ def ProcSvmFromPackets(base,
         base.pointsVertex.setData3f(10000, 10000, 10000)
         base.pointsColor.setData4f(0, 0, 0, 0)
         
-    imgs = np.array(imgs)
-    base.planeTexArray.setRamImage(imgs)
 
 def PacketProcessing(packetInit: dict, q: queue):
 
@@ -623,9 +624,9 @@ def PacketProcessing(packetInit: dict, q: queue):
             worldpointList = DepthToPoint.toPoints(packetInit["lidarChs"],packetInit["lidarRes"],
                                 30,360 ,depthmapnp)
         
-        if packetInit :
+        if not packetInit :
             continue
-        
+
         # print(worldpointList[1])
         ProcSvmFromPackets(mySvm, 
                         packetInit['numLidars'], packetInit["lidarRes"], packetInit["lidarChs"], 
@@ -643,11 +644,14 @@ if __name__ == "__main__":
     packetInit = dict()
     q = queue.Queue(maxsize=10)
 
+    mySvm.packetInit = packetInit
+    mySvm.qQ = q
+    mySvm.taskMgr.add(UpdateResource, "UpdateResource", sort=0)
+
     print("UDP server up and listening")
     t1 = threading.Thread(target=UDP_Receiver.ReceiveData, args=(packetInit, q))
     t1.start()
-
-    t2 = threading.Thread(target=PacketProcessing, args=(packetInit, q))
-    t2.start()
+    #t2 = threading.Thread(target=PacketProcessing, args=(packetInit, q))
+    #t2.start()
         
     mySvm.run()

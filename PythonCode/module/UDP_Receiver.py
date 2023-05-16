@@ -48,6 +48,8 @@ def ReceiveData(packetInit: dict, q: queue):
             print("Camera Width : {}".format(packetInit["imageWidth"]))
             print("Camera Height : {}".format(packetInit["imageHeight"]))
         else:
+            if not packetInit:
+                continue
             # print("frame : ", frame)
             # print("packet count : ", count)
             if frame not in packetDict:
