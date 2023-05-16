@@ -1,5 +1,3 @@
-import socket
-
 import threading
 import queue
 import cv2 as cv
@@ -172,7 +170,7 @@ class SurroundView(ShowBase):
         
         draw_sphere(self, 500000, (0,0,0), (1,1,1,1))
         self.sphereShader = Shader.load(
-            Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
+            Shader.SL_GLSL, vertex="./shaders/sphere_vs.glsl", fragment="./shaders/sphere_ps.glsl")
         self.sphere.setShader(self.sphereShader)
         self.sphere.reparentTo(self.renderObj)
 
@@ -180,7 +178,7 @@ class SurroundView(ShowBase):
         self.quad = manager.renderSceneInto(colortex=None) # make dummy texture... for post processing...
         #mySvm.quad = manager.renderQuadInto(colortex=tex)
         self.quad.setShader(Shader.load(
-                        Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps.glsl"))
+                        Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post1_ps.glsl"))
         self.quad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.quad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.quad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
@@ -188,7 +186,7 @@ class SurroundView(ShowBase):
         def GeneratePlaneNode(svmBase):
             #shader setting for SVM
             svmBase.planeShader = Shader.load(
-                Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps_plane.glsl")
+                Shader.SL_GLSL, vertex="./shaders/svm_vs.glsl", fragment="./shaders/svm_ps_plane.glsl")
             vdata = p3d.GeomVertexData(
                 'triangle_data', p3d.GeomVertexFormat.getV3t2(), p3d.Geom.UHStatic)
             vdata.setNumRows(4)  # optional for performance enhancement!
@@ -289,14 +287,14 @@ class SurroundView(ShowBase):
     
     def shaderRecompile(self):
         self.planeShader = Shader.load(
-            Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps_plane.glsl")
+            Shader.SL_GLSL, vertex="./shaders/svm_vs.glsl", fragment="./shaders/svm_ps_plane.glsl")
         self.plane.setShader(mySvm.planeShader)
         self.sphereShader = Shader.load(
-            Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
+            Shader.SL_GLSL, vertex="./shaders/sphere_vs.glsl", fragment="./shaders/sphere_ps.glsl")
         self.sphere.setShader(self.sphereShader)
         
         self.quad.setShader(Shader.load(
-                Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps.glsl"))   
+                Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post1_ps.glsl"))   
 
 
 def GeneratePointNode(task):
@@ -327,12 +325,6 @@ def GeneratePointNode(task):
         # https://docs.panda3d.org/1.9/cpp/programming/internal-structures/other-manipulation/more-about-reader-writer-rewriter
         # This allows you to store color components in the range 0.0 .. 1.0, and get the expected result (that is, the value is scaled into the range 0 .. 255). A similar conversion happens when data is read.
         color.addData4f(0, 0, 0, 0.0)
-
-    #vertex.setRow(0)
-    #color.setRow(0)
-    #for point, inputColor in zip(points, colors):
-    #    vertex.addData3f(point)
-    #    color.addData4f(inputColor[0], inputColor[1], inputColor[2], 1.0)
 
     primPoints = p3d.GeomPoints(p3d.Geom.UHDynamic)
     primPoints.addConsecutiveVertices(0, numMaxPoints)
@@ -442,18 +434,12 @@ def ProcSvmFromPackets(base,
             sensorMatLHS_array[imgIdx] = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, 1)) * p3d.LMatrix4f.translateMat(pos.x, pos.y, pos.z)
             
             camMat = localCamMat * sensorMatRHS
-            #camMat3 = camMat.getUpper3()  # or, use xformVec instead
-            
-            # think... LHS to RHS...
-            # also points...
             
             camPos = camMat.xformPoint(p3d.Vec3(0, 0, 0))
             view = camMat.xformVec(p3d.Vec3(1, 0, 0))
             up = camMat.xformVec(p3d.Vec3(0, 0, 1))
             viewMat = computeLookAt(camPos, camPos + view, up)
 
-            #viewProjMat = p3d.LMatrix4f()
-            #viewProjMat = viewMat * projMat
             viewProjMat = viewMat * projMat
             
             matViewProjs[imgIdx] = viewProjMat
@@ -463,12 +449,6 @@ def ProcSvmFromPackets(base,
                 print(("camDir {}").format(camMat.xform(p3d.Vec3(1, 0, 0)))) 
                 print(("camUp  {}").format(camMat.xform(p3d.Vec3(0, 0, 1))))
                 print("############")
-                #print(("test pos1  {}").format(viewMat.xformPoint(p3d.Vec3(1000, 0, 0)))) 
-                #print(("test pos2  {}").format(viewProjMat.xform(p3d.Vec4(1000, 0, 0, 1))))
-                #print(("test pos3  {}").format(viewProjMat.xform(p3d.Vec4(30.15, 0, 0, 1))))
-                #print(("test pos3  {}").format(viewProjMat.xform(p3d.Vec4(-1000, 0, 0, 1))))
-                #base.plane.setShaderInput("matTest0", viewMat)
-                #base.plane.setShaderInput("matTest1", projMat)
 
             base.plane.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
             # print("plane.setShaderInput")
@@ -477,14 +457,6 @@ def ProcSvmFromPackets(base,
             base.sphere.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
             # print("plane.setShaderInput")
             imgIdx += 1
-
-        #base.plane.setShaderInput("matViewProjs", matViewProjs)
-        #base.planePnm = p3d.PNMImage()
-        #for i in range(4):
-        #    base.planeTexs[i].setup2dTexture(
-        #        imageWidth, imageHeight, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
-        #    base.plane.setShaderInput(
-        #        'myTexture' + str(i), base.planeTexs[i])
 
         base.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
         base.plane.setShaderInput('cameraImgs', base.planeTexArray)
@@ -505,11 +477,11 @@ def ProcSvmFromPackets(base,
         base.pointsColor.setRow(0)
 
         # testpointcloud-------------------------------------------------------
-        # for i in worldpointlist:
-        #     posPoint = p3d.LPoint3f(i[0], i[1], i[2])
-        #     posPointWS = base.sensorMatLHS_array[0].xformPoint(posPoint)
-        #     base.pointsVertex.setData3f(posPointWS)
-        #     base.pointsColor.setData4f( 1,1,1,1)
+        for i in worldpointlist:
+            posPoint = p3d.LPoint3f(i[0], i[1], i[2])
+            posPointWS = base.sensorMatLHS_array[0].xformPoint(posPoint)
+            base.pointsVertex.setData3f(posPointWS)
+            base.pointsColor.setData4f( 1,1,1,1)
         #------------------------------------------------------------------------------------------
 
         # for i in range(4):
@@ -647,3 +619,4 @@ if __name__ == "__main__":
     time.sleep(2)
     print("func2 start")
     t2.start()
+    mySvm.run()
