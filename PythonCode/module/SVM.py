@@ -299,11 +299,8 @@ class SurroundView(ShowBase):
                 Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps.glsl"))   
 
 
-def GeneratePointNode(task):
+def GeneratePointNode():
     svmBase = mySvm
-    if svmBase.lidarRes == 0 or svmBase.lidarChs == 0 or svmBase.numLidars == 0:
-        return task.cont
-
     # note: use Geom.UHDynamic instead of Geom.UHStatic (resource setting for immutable or dynamic)
     vdata = p3d.GeomVertexData(
         'point_data', p3d.GeomVertexFormat.getV3c4(), p3d.Geom.UHDynamic)
@@ -356,233 +353,238 @@ def GeneratePointNode(task):
     #material.setShininess(1000)
     #svmBase.points.setMaterial(material)
     svmBase.points.set_render_mode_thickness(5)
-
     svmBase.isPointCloudSetup = True
-    return task.done  # remove this task
 
 def UpdateResource(task):
     return task.cont
+
+def InitSVM(base,
+            numLidars, lidarRes, lidarChs, 
+            imageWidth, imageHeight, imgs, worldpointlist):
+    if base.isInitializedUDP is True:
+        return
+    
+    def createOglProjMatrix(fov, aspectRatio, n, f):
+        tanHalfFovy = math.tan(fov / 2.0 * np.deg2rad(1))
+        tanHalfFovx = tanHalfFovy * aspectRatio
+        # col major in pand3d core but memory convention is based on the conventional row major
+        # GLM_DEPTH_CLIP_SPACE == GLM_DEPTH_ZERO_TO_ONE version
+        projMat = p3d.LMatrix4f(1.0 / tanHalfFovx, 0, 0, 0,
+                                0, 1.0 / tanHalfFovy, 0, 0,
+                                0, 0, f / (n - f), -f * n / (f - n),
+                                0, 0, -1, 0)
+        projMat.transpose_in_place()
+        return projMat
+    
+    def computeLookAt(camera_pos, camera_target, camera_up):
+        forward = camera_pos - camera_target
+        forward.normalize()
+        right = forward.cross(camera_up)
+        right.normalize()
+        up = right.cross(forward)
+        #print(("right {}").format(right))
+        #print(("up {}").format(up))
+        #print(("forward  {}").format(forward))
+        # row major in pand3d core but memory convention is based on the conventional column major
+        matLookAt = p3d.LMatrix4f(
+            right[0], up[0], forward[0], 0.0,
+            right[1], up[1], forward[1], 0.0,
+            right[2], up[2], forward[2], 0.0,
+            -p3d.LVector3f.dot(right, camera_pos),
+            -p3d.LVector3f.dot(up, camera_pos),
+            -p3d.LVector3f.dot(forward, camera_pos), 1.0)
+        return matLookAt
+
+    base.isInitializedUDP = True
+
+    print(("Num Lidars : {Num}").format(Num=numLidars))
+    print(("Lidar Channels : {Num}").format(Num=lidarChs))
+    print(("Camera Width : {Num}").format(Num=imageWidth))
+    print(("Camera Height : {Num}").format(Num=imageHeight))
+
+    base.lidarRes = lidarRes
+    base.lidarChs = lidarChs
+    base.numLidars = numLidars
+    
+    GeneratePointNode()
+
+    verFoV = 2 * math.atan(math.tan(150 * np.deg2rad(1) / 2) * (imageHeight/imageWidth)) * np.rad2deg(1)
+    projMat = createOglProjMatrix(verFoV, imageWidth/imageHeight, 10, 100000)
+
+    # LHS
+    center_z = -95
+    sensor_pos_array = [
+        p3d.Vec3(30, 0, 40 - center_z), 
+        p3d.Vec3(0, 60, 40 - center_z), 
+        p3d.Vec3(-40, 0, 40 - center_z), 
+        p3d.Vec3(0, -80, 40 - center_z)
+        ]
+    sensor_rot_z_array = [0, 90, 180, -90]
+    cam_pos = p3d.Vec3(0, 0, 50)
+    cam_rot_y = -10
+
+    # LHS, RHS same
+    localCamMat = p3d.LMatrix4f.rotateMat(cam_rot_y, p3d.Vec3(0, -1, 0)) * p3d.LMatrix4f.translateMat(cam_pos)
+    sensorMatLHS_array = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
+    imgIdx = 0
+    
+    for sensorPos, camPos in zip(sensor_pos_array, base.camPositions):
+        camPos = sensorPos + cam_pos
+        
+    base.plane.setShaderInput("camPositions", base.camPositions)
+
+    matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
+    for deg, pos in zip(sensor_rot_z_array, sensor_pos_array):
+        sensorMatRHS = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, -1)) * p3d.LMatrix4f.translateMat(pos.x, -pos.y, pos.z)
+        sensorMatLHS_array[imgIdx] = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, 1)) * p3d.LMatrix4f.translateMat(pos.x, pos.y, pos.z)
+        
+        camMat = localCamMat * sensorMatRHS
+        #camMat3 = camMat.getUpper3()  # or, use xformVec instead
+        
+        # think... LHS to RHS...
+        # also points...
+        
+        camPos = camMat.xformPoint(p3d.Vec3(0, 0, 0))
+        view = camMat.xformVec(p3d.Vec3(1, 0, 0))
+        up = camMat.xformVec(p3d.Vec3(0, 0, 1))
+        viewMat = computeLookAt(camPos, camPos + view, up)
+
+        #viewProjMat = p3d.LMatrix4f()
+        #viewProjMat = viewMat * projMat
+        viewProjMat = viewMat * projMat
+        
+        matViewProjs[imgIdx] = viewProjMat
+        if imgIdx == 1:
+            print(("camPos1 {}").format(camMat.xformPoint(p3d.Vec3(0, 0, 0))))
+            print(("camPos2 {}").format(pos))
+            print(("camDir {}").format(camMat.xform(p3d.Vec3(1, 0, 0)))) 
+            print(("camUp  {}").format(camMat.xform(p3d.Vec3(0, 0, 1))))
+            print("############")
+            #print(("test pos1  {}").format(viewMat.xformPoint(p3d.Vec3(1000, 0, 0)))) 
+            #print(("test pos2  {}").format(viewProjMat.xform(p3d.Vec4(1000, 0, 0, 1))))
+            #print(("test pos3  {}").format(viewProjMat.xform(p3d.Vec4(30.15, 0, 0, 1))))
+            #print(("test pos3  {}").format(viewProjMat.xform(p3d.Vec4(-1000, 0, 0, 1))))
+            #base.plane.setShaderInput("matTest0", viewMat)
+            #base.plane.setShaderInput("matTest1", projMat)
+
+        base.plane.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
+        # print("plane.setShaderInput")
+        base.quad.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
+        # print("plane.setShaderInput")
+        base.sphere.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
+        # print("plane.setShaderInput")
+        imgIdx += 1
+
+    #base.plane.setShaderInput("matViewProjs", matViewProjs)
+    #base.planePnm = p3d.PNMImage()
+    #for i in range(4):
+    #    base.planeTexs[i].setup2dTexture(
+    #        imageWidth, imageHeight, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
+    #    base.plane.setShaderInput(
+    #        'myTexture' + str(i), base.planeTexs[i])
+
+    base.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
+    base.plane.setShaderInput('cameraImgs', base.planeTexArray)
+    base.sphere.setShaderInput('cameraImgs', base.planeTexArray)
+
+    base.semanticTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
+    base.plane.setShaderInput('semanticImgs', base.semanticTexArray)
+
+    base.sensorMatLHS_array = sensorMatLHS_array
+    print("Texture Initialized!")
+    
+    zeros = np.ones((4, 256, 256), dtype=np.int32)
+    base.semanticTexArray.setRamImage(zeros)
+
 
 def ProcSvmFromPackets(base,
                        numLidars, lidarRes, lidarChs, 
                        imageWidth, imageHeight, imgs, worldpointlist):
     
-    if base.isInitializedUDP == True:
-        print(("Num Lidars : {Num}").format(Num=numLidars))
-        print(("Lidar Channels : {Num}").format(Num=lidarChs))
-        print(("Camera Width : {Num}").format(Num=imageWidth))
-        print(("Camera Height : {Num}").format(Num=imageHeight))
-        base.isInitializedUDP = False
+    InitSVM(base,
+            numLidars, lidarRes, lidarChs, 
+            imageWidth, imageHeight, imgs, worldpointlist)
+    
 
-        base.lidarRes = lidarRes
-        base.lidarChs = lidarChs
-        base.numLidars = numLidars
-        base.taskMgr.add(GeneratePointNode, "GeneratePointNode")
-        
-        # Create a opengl convention projection matrix
-        def createOglProjMatrix(fov, aspectRatio, n, f):
-            tanHalfFovy = math.tan(fov / 2.0 * np.deg2rad(1))
-            tanHalfFovx = tanHalfFovy * aspectRatio
-            # col major in pand3d core but memory convention is based on the conventional row major
-            # GLM_DEPTH_CLIP_SPACE == GLM_DEPTH_ZERO_TO_ONE version
-            projMat = p3d.LMatrix4f(1.0 / tanHalfFovx, 0, 0, 0,
-                                    0, 1.0 / tanHalfFovy, 0, 0,
-                                    0, 0, f / (n - f), -f * n / (f - n),
-                                    0, 0, -1, 0)
-            projMat.transpose_in_place()
-            return projMat
+    #print("Point Clout Update!!")
+    # point cloud buffer : fullPackets[0:bytesPoints]
+    numMaxPoints = lidarRes * lidarChs * numLidars
+    
+    base.pointsVertex.setRow(0)
+    base.pointsColor.setRow(0)
 
-        def computeLookAt(camera_pos, camera_target, camera_up):
-            forward = camera_pos - camera_target
-            forward.normalize()
-            right = forward.cross(camera_up)
-            right.normalize()
-            up = right.cross(forward)
-            #print(("right {}").format(right))
-            #print(("up {}").format(up))
-            #print(("forward  {}").format(forward))
-            # row major in pand3d core but memory convention is based on the conventional column major
-            matLookAt = p3d.LMatrix4f(
-                right[0], up[0], forward[0], 0.0,
-                right[1], up[1], forward[1], 0.0,
-                right[2], up[2], forward[2], 0.0,
-                -p3d.LVector3f.dot(right, camera_pos),
-                -p3d.LVector3f.dot(up, camera_pos),
-                -p3d.LVector3f.dot(forward, camera_pos), 1.0)
-            return matLookAt
-        
-        verFoV = 2 * math.atan(math.tan(150 * np.deg2rad(1) / 2) * (imageHeight/imageWidth)) * np.rad2deg(1)
-        projMat = createOglProjMatrix(verFoV, imageWidth/imageHeight, 10, 100000)
+    # testpointcloud-------------------------------------------------------
+    # for i in worldpointlist:
+    #     posPoint = p3d.LPoint3f(i[0], i[1], i[2])
+    #     posPointWS = base.sensorMatLHS_array[0].xformPoint(posPoint)
+    #     base.pointsVertex.setData3f(posPointWS)
+    #     base.pointsColor.setData4f( 1,1,1,1)
+    #------------------------------------------------------------------------------------------
 
-        # LHS
-        center_z = -95
-        sensor_pos_array = [
-            p3d.Vec3(30, 0, 40 - center_z), 
-            p3d.Vec3(0, 60, 40 - center_z), 
-            p3d.Vec3(-40, 0, 40 - center_z), 
-            p3d.Vec3(0, -80, 40 - center_z)
-            ]
-        sensor_rot_z_array = [0, 90, 180, -90]
-        cam_pos = p3d.Vec3(0, 0, 50)
-        cam_rot_y = -10
+    # for i in range(4):
+    #     numSingleLidarPoints = int.from_bytes(fullPackets[offsetPoints: 4 + offsetPoints], "little")
+    #     #print(("Num Process Points : {Num}").format(Num=numSingleLidarPoints))
 
-        # LHS, RHS same
-        localCamMat = p3d.LMatrix4f.rotateMat(cam_rot_y, p3d.Vec3(0, -1, 0)) * p3d.LMatrix4f.translateMat(cam_pos)
-        sensorMatLHS_array = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
-        imgIdx = 0
-        
-        for sensorPos, camPos in zip(sensor_pos_array, base.camPositions):
-            camPos = sensorPos + cam_pos
+    #     matSensorLHS = base.sensorMatLHS_array[i]
+    #     offsetPoints += 4
+    #     numProcessPoints += numSingleLidarPoints
+    #     for j in range(numSingleLidarPoints):
+    #         pX = struct.unpack('<f', fullPackets[0 + offsetPoints : 4 + offsetPoints])[0]
+    #         pY = struct.unpack('<f', fullPackets[4 + offsetPoints : 8 + offsetPoints])[0]
+    #         pZ = struct.unpack('<f', fullPackets[8 + offsetPoints: 12 + offsetPoints])[0]
+    #         #cR = np.frombuffer(fullPackets[12 + offsetPoints, 13 + offsetPoints], dtype=np.int8)[0]
+    #         cR = int.from_bytes(fullPackets[12 + offsetPoints : 13 + offsetPoints], "little")
+    #         cG = int.from_bytes(fullPackets[13 + offsetPoints : 14 + offsetPoints], "little")
+    #         cB = int.from_bytes(fullPackets[14 + offsetPoints : 15 + offsetPoints], "little")
+    #         cA = int.from_bytes(fullPackets[15 + offsetPoints : 16 + offsetPoints], "little")
+    #         #if j == 17 :
+    #         #    print(("pos : {}, {}, {}, {}, {}").format(i, offsetPoints, pX, pY, pZ))
+    #         #    print(("clr : {}, {}, {}, {}, {}, {}").format(i, offsetPoints, cR, cG, cB, cA))
+    #         offsetPoints += 16
+    #         posPoint = p3d.LPoint3f(pX, pY, pZ)
             
-        base.plane.setShaderInput("camPositions", base.camPositions)
-
-        matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
-        for deg, pos in zip(sensor_rot_z_array, sensor_pos_array):
-            sensorMatRHS = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, -1)) * p3d.LMatrix4f.translateMat(pos.x, -pos.y, pos.z)
-            sensorMatLHS_array[imgIdx] = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, 1)) * p3d.LMatrix4f.translateMat(pos.x, pos.y, pos.z)
+    #         # to do : transform posPoint (local) to world
+    #         posPointWS = matSensorLHS.xformPoint(posPoint)
+    #         posPointWS.y *= -1
+    #         #y = posPointWS.y
+    #         #posPointWS.y = posPointWS.x
+    #         #posPointWS.x = y 
+    #         #if posPointWS.z > base.waterZ + 1:
             
-            camMat = localCamMat * sensorMatRHS
-            #camMat3 = camMat.getUpper3()  # or, use xformVec instead
+    #         color = colormap(posPointWS.z/150)
+    #         cR = color[0] * 255.0
+    #         cG = color[1] * 255.0
+    #         cB = color[2] * 255.0
             
-            # think... LHS to RHS...
-            # also points...
+    #         base.pointsVertex.setData3f(posPointWS)
+    #         base.pointsColor.setData4f(cB / 255.0, cG / 255.0, cR / 255.0, cA / 255.0)
             
-            camPos = camMat.xformPoint(p3d.Vec3(0, 0, 0))
-            view = camMat.xformVec(p3d.Vec3(1, 0, 0))
-            up = camMat.xformVec(p3d.Vec3(0, 0, 1))
-            viewMat = computeLookAt(camPos, camPos + view, up)
-
-            #viewProjMat = p3d.LMatrix4f()
-            #viewProjMat = viewMat * projMat
-            viewProjMat = viewMat * projMat
-            
-            matViewProjs[imgIdx] = viewProjMat
-            if imgIdx == 1:
-                print(("camPos1 {}").format(camMat.xformPoint(p3d.Vec3(0, 0, 0))))
-                print(("camPos2 {}").format(pos))
-                print(("camDir {}").format(camMat.xform(p3d.Vec3(1, 0, 0)))) 
-                print(("camUp  {}").format(camMat.xform(p3d.Vec3(0, 0, 1))))
-                print("############")
-                #print(("test pos1  {}").format(viewMat.xformPoint(p3d.Vec3(1000, 0, 0)))) 
-                #print(("test pos2  {}").format(viewProjMat.xform(p3d.Vec4(1000, 0, 0, 1))))
-                #print(("test pos3  {}").format(viewProjMat.xform(p3d.Vec4(30.15, 0, 0, 1))))
-                #print(("test pos3  {}").format(viewProjMat.xform(p3d.Vec4(-1000, 0, 0, 1))))
-                #base.plane.setShaderInput("matTest0", viewMat)
-                #base.plane.setShaderInput("matTest1", projMat)
-
-            base.plane.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
-            # print("plane.setShaderInput")
-            base.quad.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
-            # print("plane.setShaderInput")
-            base.sphere.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
-            # print("plane.setShaderInput")
-            imgIdx += 1
-
-        #base.plane.setShaderInput("matViewProjs", matViewProjs)
-        #base.planePnm = p3d.PNMImage()
-        #for i in range(4):
-        #    base.planeTexs[i].setup2dTexture(
-        #        imageWidth, imageHeight, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
-        #    base.plane.setShaderInput(
-        #        'myTexture' + str(i), base.planeTexs[i])
-
-        base.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
-        base.plane.setShaderInput('cameraImgs', base.planeTexArray)
-        base.sphere.setShaderInput('cameraImgs', base.planeTexArray)
-
-        base.semanticTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
-        base.plane.setShaderInput('semanticImgs', base.semanticTexArray)
-
-        base.sensorMatLHS_array = sensorMatLHS_array
-        print("Texture Initialized!")
-        
-    if base.isPointCloudSetup == True:
-        #print("Point Clout Update!!")
-        # point cloud buffer : fullPackets[0:bytesPoints]
-        numMaxPoints = lidarRes * lidarChs * numLidars
-        
-        base.pointsVertex.setRow(0)
-        base.pointsColor.setRow(0)
-
-        # testpointcloud-------------------------------------------------------
-        # for i in worldpointlist:
-        #     posPoint = p3d.LPoint3f(i[0], i[1], i[2])
-        #     posPointWS = base.sensorMatLHS_array[0].xformPoint(posPoint)
-        #     base.pointsVertex.setData3f(posPointWS)
-        #     base.pointsColor.setData4f( 1,1,1,1)
-        #------------------------------------------------------------------------------------------
-
-        # for i in range(4):
-        #     numSingleLidarPoints = int.from_bytes(fullPackets[offsetPoints: 4 + offsetPoints], "little")
-        #     #print(("Num Process Points : {Num}").format(Num=numSingleLidarPoints))
-
-        #     matSensorLHS = base.sensorMatLHS_array[i]
-        #     offsetPoints += 4
-        #     numProcessPoints += numSingleLidarPoints
-        #     for j in range(numSingleLidarPoints):
-        #         pX = struct.unpack('<f', fullPackets[0 + offsetPoints : 4 + offsetPoints])[0]
-        #         pY = struct.unpack('<f', fullPackets[4 + offsetPoints : 8 + offsetPoints])[0]
-        #         pZ = struct.unpack('<f', fullPackets[8 + offsetPoints: 12 + offsetPoints])[0]
-        #         #cR = np.frombuffer(fullPackets[12 + offsetPoints, 13 + offsetPoints], dtype=np.int8)[0]
-        #         cR = int.from_bytes(fullPackets[12 + offsetPoints : 13 + offsetPoints], "little")
-        #         cG = int.from_bytes(fullPackets[13 + offsetPoints : 14 + offsetPoints], "little")
-        #         cB = int.from_bytes(fullPackets[14 + offsetPoints : 15 + offsetPoints], "little")
-        #         cA = int.from_bytes(fullPackets[15 + offsetPoints : 16 + offsetPoints], "little")
-        #         #if j == 17 :
-        #         #    print(("pos : {}, {}, {}, {}, {}").format(i, offsetPoints, pX, pY, pZ))
-        #         #    print(("clr : {}, {}, {}, {}, {}, {}").format(i, offsetPoints, cR, cG, cB, cA))
-        #         offsetPoints += 16
-        #         posPoint = p3d.LPoint3f(pX, pY, pZ)
-                
-        #         # to do : transform posPoint (local) to world
-        #         posPointWS = matSensorLHS.xformPoint(posPoint)
-        #         posPointWS.y *= -1
-        #         #y = posPointWS.y
-        #         #posPointWS.y = posPointWS.x
-        #         #posPointWS.x = y 
-        #         #if posPointWS.z > base.waterZ + 1:
-                
-        #         color = colormap(posPointWS.z/150)
-        #         cR = color[0] * 255.0
-        #         cG = color[1] * 255.0
-        #         cB = color[2] * 255.0
-                
-        #         base.pointsVertex.setData3f(posPointWS)
-        #         base.pointsColor.setData4f(cB / 255.0, cG / 255.0, cR / 255.0, cA / 255.0)
-                
-        #         #if i == 0:
-        #         #    base.pointsColor.setData4f(0, 0, 1, 1)
-        #         #elif i == 1:
-        #         #    base.pointsColor.setData4f(0, 1, 0, 1)
-        #         #elif i == 2:
-        #         #    base.pointsColor.setData4f(1, 0, 0, 1)
-        #         #elif i == 3:
-        #         #    base.pointsColor.setData4f(0, 1, 1, 1)
+    #         #if i == 0:
+    #         #    base.pointsColor.setData4f(0, 0, 1, 1)
+    #         #elif i == 1:
+    #         #    base.pointsColor.setData4f(0, 1, 0, 1)
+    #         #elif i == 2:
+    #         #    base.pointsColor.setData4f(1, 0, 0, 1)
+    #         #elif i == 3:
+    #         #    base.pointsColor.setData4f(0, 1, 1, 1)
 
 
 
-        #         #base.pointsColor.setData4f(1.0, 0, 0, 1.0)
-        #     #print(("Num Process Points : {Num}").format(Num=numProcessPoints))
+    #         #base.pointsColor.setData4f(1.0, 0, 0, 1.0)
+    #     #print(("Num Process Points : {Num}").format(Num=numProcessPoints))
 
-        # for i in range(numMaxPoints - len(worldpointlist)):
-        #     base.pointsVertex.setData3f(10000, 10000, 10000)
-        #     base.pointsColor.setData4f(0, 0, 0, 0)
+    # for i in range(numMaxPoints - len(worldpointlist)):
+    #     base.pointsVertex.setData3f(10000, 10000, 10000)
+    #     base.pointsColor.setData4f(0, 0, 0, 0)
 
-        for i in range(numMaxPoints):
-            base.pointsVertex.setData3f(10000, 10000, 10000)
-            base.pointsColor.setData4f(0, 0, 0, 0)
-            
+    for i in range(numMaxPoints):
+        base.pointsVertex.setData3f(10000, 10000, 10000)
+        base.pointsColor.setData4f(0, 0, 0, 0)
         
     imgs = np.array(imgs)
     base.planeTexArray.setRamImage(imgs)
-    zeros = np.ones((4, 256, 256), dtype=np.int32)
-    base.semanticTexArray.setRamImage(zeros)
 
-
-        
-    # cv.waitKey(1)
-
-def func(packetInit: dict, q: queue):
+def PacketProcessing(packetInit: dict, q: queue):
 
     while True:
         if q.empty():
@@ -592,7 +594,7 @@ def func(packetInit: dict, q: queue):
 
         fullPackets = bytearray(q.get())
         
-        index2 = int.from_bytes(fullPackets[0:4], "little")
+        #index2 = int.from_bytes(fullPackets[0:4], "little")
         #print("index : ",index2)
 
         offsetDepth = 4
@@ -621,16 +623,18 @@ def func(packetInit: dict, q: queue):
             worldpointList = DepthToPoint.toPoints(packetInit["lidarChs"],packetInit["lidarRes"],
                                 30,360 ,depthmapnp)
         
+        if packetInit :
+            continue
+        
         # print(worldpointList[1])
         ProcSvmFromPackets(mySvm, 
                         packetInit['numLidars'], packetInit["lidarRes"], packetInit["lidarChs"], 
                         packetInit['imageWidth'], packetInit["imageHeight"], imgs, worldpointList)
         
-
 if __name__ == "__main__":
     
     mySvm = SurroundView()
-    mySvm.isInitializedUDP = True
+    mySvm.isInitializedUDP = False
 
     width = mySvm.win.get_x_size()
     height = mySvm.win.get_y_size()
@@ -641,9 +645,9 @@ if __name__ == "__main__":
 
     print("UDP server up and listening")
     t1 = threading.Thread(target=UDP_Receiver.ReceiveData, args=(packetInit, q))
-    t2 = threading.Thread(target=func, args=(packetInit, q))
-
     t1.start()
-    time.sleep(2)
-    print("func2 start")
+
+    t2 = threading.Thread(target=PacketProcessing, args=(packetInit, q))
     t2.start()
+        
+    mySvm.run()

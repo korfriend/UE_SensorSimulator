@@ -3,6 +3,7 @@ import queue
 import numpy as np
 import time
 
+
 def ReceiveData(packetInit: dict, q: queue):
     localIP = "127.0.0.1"
     localPort = 12000
@@ -69,3 +70,4 @@ def ReceiveData(packetInit: dict, q: queue):
                 #else : 
                     # no full packet
                     #continue
+        
