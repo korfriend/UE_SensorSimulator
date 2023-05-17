@@ -3,6 +3,7 @@ import queue
 import numpy as np
 import time
 
+
 def ReceiveData(packetInit: dict, q: queue):
     localIP = "127.0.0.1"
     localPort = 12000
@@ -47,6 +48,8 @@ def ReceiveData(packetInit: dict, q: queue):
             print("Camera Width : {}".format(packetInit["imageWidth"]))
             print("Camera Height : {}".format(packetInit["imageHeight"]))
         else:
+            if not packetInit:
+                continue
             # print("frame : ", frame)
             # print("packet count : ", count)
             if frame not in packetDict:
@@ -69,3 +72,4 @@ def ReceiveData(packetInit: dict, q: queue):
                 #else : 
                     # no full packet
                     #continue
+        
