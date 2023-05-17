@@ -44,3 +44,7 @@ Intermediate/
 *.exe
 *.out
 *.app
+
+# Ignore Python cache and model files
+__pycache__/
+*.pt
