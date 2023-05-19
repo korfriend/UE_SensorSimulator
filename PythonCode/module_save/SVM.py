@@ -469,7 +469,7 @@ def ProcSvmFromPackets(base,
         print("Texture Initialized!")
         
     if base.isPointCloudSetup == True:
-        #print("Point Clout Update!!")
+        print("Point Clout Update!!")
         # point cloud buffer : fullPackets[0:bytesPoints]
         numMaxPoints = lidarRes * lidarChs * numLidars
         
@@ -478,10 +478,10 @@ def ProcSvmFromPackets(base,
 
         # testpointcloud-------------------------------------------------------
         for i in worldpointlist:
-            posPoint = p3d.LPoint3f(i[0], i[1], i[2])
+            posPoint = p3d.LPoint3f(i[0][0], i[0][1], i[0][2])
             posPointWS = base.sensorMatLHS_array[0].xformPoint(posPoint)
             base.pointsVertex.setData3f(posPointWS)
-            base.pointsColor.setData4f( 1,1,1,1)
+            base.pointsColor.setData4f( 1,1,0,1)
         #------------------------------------------------------------------------------------------
 
         # for i in range(4):
@@ -540,15 +540,15 @@ def ProcSvmFromPackets(base,
         #     base.pointsVertex.setData3f(10000, 10000, 10000)
         #     base.pointsColor.setData4f(0, 0, 0, 0)
 
-        for i in range(numMaxPoints):
-            base.pointsVertex.setData3f(10000, 10000, 10000)
-            base.pointsColor.setData4f(0, 0, 0, 0)
+        # for i in range(numMaxPoints):
+        #     base.pointsVertex.setData3f(10000, 10000, 10000)
+        #     base.pointsColor.setData4f(0, 0, 0, 0)
             
         
-    imgs = np.array(imgs)
-    base.planeTexArray.setRamImage(imgs)
-    zeros = np.ones((4, 256, 256), dtype=np.int32)
-    base.semanticTexArray.setRamImage(zeros)
+        imgs = np.array(imgs)
+        base.planeTexArray.setRamImage(imgs)
+        zeros = np.ones((4, 256, 256), dtype=np.int32)
+        base.semanticTexArray.setRamImage(zeros)
 
 
         
