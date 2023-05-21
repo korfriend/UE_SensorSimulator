@@ -134,10 +134,11 @@ void main()
     
     // height correction
     switch (semantic) {
-        case 2: pos.z = 0; break;
-        case 3: pos.z = 50; break;
-        case 4: pos.z = 99.0; break;
+        case 2: pos.z = 25.0; break;
+        case 3: pos.z = 100; break;
+        case 4: pos.z = 100.1; break;
     }
+    pos.z = 0;
 
     int overlapIndex[4] = {int(camId0), int(camId1), 0, 0};
     const int debugMode = 0;
