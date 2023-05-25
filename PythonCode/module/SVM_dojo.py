@@ -170,12 +170,6 @@ class SurroundView(ShowBase):
         self.lidarChs = 0
         self.numLidars = 0
         
-        draw_sphere(self, 500000, (0,0,0), (1,1,1,1))
-        self.sphereShader = Shader.load(
-            Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
-        self.sphere.setShader(self.sphereShader)
-        self.sphere.reparentTo(self.renderObj)
-
         manager = FilterManager(self.win, self.cam)
         self.quad = manager.renderSceneInto(colortex=None) # make dummy texture... for post processing...
         #mySvm.quad = manager.renderQuadInto(colortex=tex)
@@ -198,7 +192,7 @@ class SurroundView(ShowBase):
             bbox = svmBase.boat.getTightBounds()
             print(bbox)
             self.waterZ = 0 # 0.2
-            waterPlaneLength = 2500
+            waterPlaneLength = 4000
             vertex.addData3(-waterPlaneLength, waterPlaneLength, self.waterZ)
             vertex.addData3(waterPlaneLength, waterPlaneLength, self.waterZ)
             vertex.addData3(waterPlaneLength, -waterPlaneLength, self.waterZ)
@@ -222,20 +216,14 @@ class SurroundView(ShowBase):
             svmBase.plane.setShader(svmBase.planeShader)
 
             # the following mat4 array does not work... 
-            #matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
-            #svmBase.plane.setShaderInput("matViewProjs", matViewProjs)
-            
-            #svmBase.planeTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
             for i in range(4):
                 svmBase.plane.setShaderInput('matViewProj' + str(i), p3d.Mat4())
-                svmBase.sphere.setShaderInput('matViewProj' + str(i), p3d.Mat4())
                 svmBase.quad.setShaderInput('matViewProj' + str(i), p3d.Mat4())
 
             svmBase.planeTexArray = p3d.Texture()
             svmBase.planeTexArray.setup2dTextureArray(256, 256, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
             svmBase.plane.setShaderInput('cameraImgs', svmBase.planeTexArray)
             svmBase.quad.setShaderInput("cameraImgs", svmBase.planeTexArray)
-            svmBase.sphere.setShaderInput('cameraImgs', svmBase.planeTexArray)
 
             svmBase.camPositions = [p3d.LVector4f(), p3d.LVector4f(),
                   p3d.LVector4f(), p3d.LVector4f()]
@@ -243,12 +231,10 @@ class SurroundView(ShowBase):
 
             
             # initial setting like the above code! (for resource optimization)
-            # svmBase.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
             svmBase.semanticTexArray = p3d.Texture()
             svmBase.semanticTexArray.setup2dTextureArray(256, 256, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
             svmBase.plane.setShaderInput('semanticImgs', svmBase.semanticTexArray)
             svmBase.quad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
-            svmBase.sphere.setShaderInput('semanticImgs', svmBase.semanticTexArray)
 
             zeros = np.ones((4, 256, 256), dtype=np.int32)
             svmBase.semanticTexArray.setRamImage(zeros)
@@ -294,13 +280,9 @@ class SurroundView(ShowBase):
         self.planeShader = Shader.load(
             Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps_plane.glsl")
         self.plane.setShader(mySvm.planeShader)
-        self.sphereShader = Shader.load(
-            Shader.SL_GLSL, vertex="sphere_vs.glsl", fragment="sphere_ps.glsl")
-        self.sphere.setShader(self.sphereShader)
         
         self.quad.setShader(Shader.load(
                 Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps.glsl"))   
-
 
 def GeneratePointNode():
     svmBase = mySvm
@@ -362,11 +344,15 @@ def UpdateResource(task):
     PacketProcessing(mySvm.packetInit, mySvm.qQ)
     return task.cont
 
-def InitSVM(base,
-            numLidars, lidarRes, lidarChs, 
-            imageWidth, imageHeight, imgs, worldpointlist):
-    if base.isInitializedUDP is True:
-        return
+def InitSVM(base, packetInit):
+    if base.isInitializedUDP is True or len(packetInit) is 0:
+        return 
+        
+    numLidars = base.numLidars = packetInit["numLidars"]
+    lidarRes = base.lidarRes = packetInit["lidarRes"]
+    lidarChs = base.lidarChs = packetInit["lidarChs"]
+    imageWidth = base.imageWidth = packetInit["imageWidth"]
+    imageHeight = base.imageHeight = packetInit["imageHeight"]
     
     def createOglProjMatrix(fov, aspectRatio, n, f):
         tanHalfFovy = math.tan(fov / 2.0 * np.deg2rad(1))
@@ -405,10 +391,6 @@ def InitSVM(base,
     print(("Lidar Channels : {Num}").format(Num=lidarChs))
     print(("Camera Width : {Num}").format(Num=imageWidth))
     print(("Camera Height : {Num}").format(Num=imageHeight))
-
-    base.lidarRes = lidarRes
-    base.lidarChs = lidarChs
-    base.numLidars = numLidars
     
     GeneratePointNode()
 
@@ -416,15 +398,15 @@ def InitSVM(base,
     projMat = createOglProjMatrix(verFoV, imageWidth/imageHeight, 10, 100000)
 
     # LHS
-    center_z = -95
-    sensor_pos_array = [
-        p3d.Vec3(30, 0, 40 - center_z), 
-        p3d.Vec3(0, 60, 40 - center_z), 
-        p3d.Vec3(-40, 0, 40 - center_z), 
-        p3d.Vec3(0, -80, 40 - center_z)
+    center_z = 0 # note my UE's sensor is attached to a model whose origin is ground
+    sensor_pos_array = [ # RGB in sensor space
+        p3d.Vec3(80, 0, 50 - center_z), 
+        p3d.Vec3(0, 80, 50 - center_z), 
+        p3d.Vec3(-80, 0, 50 - center_z), 
+        p3d.Vec3(0, -80, 50 - center_z)
         ]
     sensor_rot_z_array = [0, 90, 180, -90]
-    cam_pos = p3d.Vec3(0, 0, 50)
+    cam_pos = p3d.Vec3(0, 0, 190)
     cam_rot_y = -10
 
     # LHS, RHS same
@@ -475,8 +457,6 @@ def InitSVM(base,
         # print("plane.setShaderInput")
         base.quad.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
         # print("plane.setShaderInput")
-        base.sphere.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
-        # print("plane.setShaderInput")
         imgIdx += 1
 
     #base.plane.setShaderInput("matViewProjs", matViewProjs)
@@ -489,7 +469,6 @@ def InitSVM(base,
 
     base.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
     base.plane.setShaderInput('cameraImgs', base.planeTexArray)
-    base.sphere.setShaderInput('cameraImgs', base.planeTexArray)
 
     base.semanticTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
     base.plane.setShaderInput('semanticImgs', base.semanticTexArray)
@@ -497,88 +476,13 @@ def InitSVM(base,
     base.sensorMatLHS_array = sensorMatLHS_array
     print("Texture Initialized!")
 
-def ProcSvmFromPackets(base,
-                       numLidars, lidarRes, lidarChs, 
-                       imageWidth, imageHeight, imgs, worldpointlist):
-    
-    #imgs = np.array(imgs)
-    #base.planeTexArray.setRamImage(imgs)
-    #time.sleep(0.01)
 
-    InitSVM(base,
-            numLidars, lidarRes, lidarChs, 
-            imageWidth, imageHeight, imgs, worldpointlist)
+def ProcSvmFromPackets(base, numLidars, lidarRes, lidarChs):
     
-    #print("Point Clout Update!!")
-    # point cloud buffer : fullPackets[0:bytesPoints]
     numMaxPoints = lidarRes * lidarChs * numLidars
     
     base.pointsVertex.setRow(0)
     base.pointsColor.setRow(0)
-
-    # testpointcloud-------------------------------------------------------
-    # for i in worldpointlist:
-    #     posPoint = p3d.LPoint3f(i[0], i[1], i[2])
-    #     posPointWS = base.sensorMatLHS_array[0].xformPoint(posPoint)
-    #     base.pointsVertex.setData3f(posPointWS)
-    #     base.pointsColor.setData4f( 1,1,1,1)
-    #------------------------------------------------------------------------------------------
-
-    # for i in range(4):
-    #     numSingleLidarPoints = int.from_bytes(fullPackets[offsetPoints: 4 + offsetPoints], "little")
-    #     #print(("Num Process Points : {Num}").format(Num=numSingleLidarPoints))
-
-    #     matSensorLHS = base.sensorMatLHS_array[i]
-    #     offsetPoints += 4
-    #     numProcessPoints += numSingleLidarPoints
-    #     for j in range(numSingleLidarPoints):
-    #         pX = struct.unpack('<f', fullPackets[0 + offsetPoints : 4 + offsetPoints])[0]
-    #         pY = struct.unpack('<f', fullPackets[4 + offsetPoints : 8 + offsetPoints])[0]
-    #         pZ = struct.unpack('<f', fullPackets[8 + offsetPoints: 12 + offsetPoints])[0]
-    #         #cR = np.frombuffer(fullPackets[12 + offsetPoints, 13 + offsetPoints], dtype=np.int8)[0]
-    #         cR = int.from_bytes(fullPackets[12 + offsetPoints : 13 + offsetPoints], "little")
-    #         cG = int.from_bytes(fullPackets[13 + offsetPoints : 14 + offsetPoints], "little")
-    #         cB = int.from_bytes(fullPackets[14 + offsetPoints : 15 + offsetPoints], "little")
-    #         cA = int.from_bytes(fullPackets[15 + offsetPoints : 16 + offsetPoints], "little")
-    #         #if j == 17 :
-    #         #    print(("pos : {}, {}, {}, {}, {}").format(i, offsetPoints, pX, pY, pZ))
-    #         #    print(("clr : {}, {}, {}, {}, {}, {}").format(i, offsetPoints, cR, cG, cB, cA))
-    #         offsetPoints += 16
-    #         posPoint = p3d.LPoint3f(pX, pY, pZ)
-            
-    #         # to do : transform posPoint (local) to world
-    #         posPointWS = matSensorLHS.xformPoint(posPoint)
-    #         posPointWS.y *= -1
-    #         #y = posPointWS.y
-    #         #posPointWS.y = posPointWS.x
-    #         #posPointWS.x = y 
-    #         #if posPointWS.z > base.waterZ + 1:
-            
-    #         color = colormap(posPointWS.z/150)
-    #         cR = color[0] * 255.0
-    #         cG = color[1] * 255.0
-    #         cB = color[2] * 255.0
-            
-    #         base.pointsVertex.setData3f(posPointWS)
-    #         base.pointsColor.setData4f(cB / 255.0, cG / 255.0, cR / 255.0, cA / 255.0)
-            
-    #         #if i == 0:
-    #         #    base.pointsColor.setData4f(0, 0, 1, 1)
-    #         #elif i == 1:
-    #         #    base.pointsColor.setData4f(0, 1, 0, 1)
-    #         #elif i == 2:
-    #         #    base.pointsColor.setData4f(1, 0, 0, 1)
-    #         #elif i == 3:
-    #         #    base.pointsColor.setData4f(0, 1, 1, 1)
-
-
-
-    #         #base.pointsColor.setData4f(1.0, 0, 0, 1.0)
-    #     #print(("Num Process Points : {Num}").format(Num=numProcessPoints))
-
-    # for i in range(numMaxPoints - len(worldpointlist)):
-    #     base.pointsVertex.setData3f(10000, 10000, 10000)
-    #     base.pointsColor.setData4f(0, 0, 0, 0)
 
     for i in range(numMaxPoints):
         base.pointsVertex.setData3f(10000, 10000, 10000)
@@ -586,12 +490,9 @@ def ProcSvmFromPackets(base,
         
 
 def PacketProcessing(packetInit: dict, q: queue):
-
-    #while True:
-        #if q.empty():
-        #    # print("텅텅")
-        #    time.sleep(0.01)
-        #    #continue
+    
+    InitSVM(mySvm, packetInit)
+    
     if not q.empty() and packetInit:
         fullPackets = bytearray(q.get())
         
@@ -599,21 +500,39 @@ def PacketProcessing(packetInit: dict, q: queue):
         #print("index : ",index2)
 
         offsetDepth = 4
-        depthMapBytes = packetInit["lidarRes"] * packetInit["lidarChs"] * 4
+        depthMapBytes = mySvm.lidarRes * mySvm.lidarChs * 4
         depthmapnp = np.array(
-            fullPackets[offsetDepth : offsetDepth + packetInit["lidarRes"] * packetInit["lidarChs"]], dtype=np.float32
+            fullPackets[offsetDepth : offsetDepth + mySvm.lidarRes * mySvm.lidarChs], dtype=np.float32
         )
-        depthmapnp = depthmapnp.reshape((packetInit["lidarChs"], packetInit["lidarRes"], 1))
+        depthmapnp = depthmapnp.reshape((mySvm.lidarChs, mySvm.lidarRes, 1))
 
         offsetColor = depthMapBytes + offsetDepth
-        imgBytes = packetInit["imageWidth"] * packetInit["imageHeight"] * 4
+        imgBytes = mySvm.imageWidth * mySvm.imageHeight * 4
         imgs = []
         for i in range(4):
             imgnp = np.array(fullPackets[offsetColor + imgBytes * i : offsetColor + imgBytes * (i + 1)], dtype=np.uint8)
-            imgnp = imgnp.reshape((packetInit["imageWidth"], packetInit["imageHeight"], 4))
+            imgnp = imgnp.reshape((mySvm.imageWidth, mySvm.imageHeight, 4))
             imgs.append(imgnp)
+        
+        
+        ## Add Code for updating target texture arrray 
+        imgnpArray = np.array(
+            fullPackets[offsetColor + imgBytes * 0 : offsetColor + imgBytes * 4], dtype=np.uint8)
+        imgArray = imgnpArray.reshape((4, mySvm.imageWidth, mySvm.imageHeight, 4))
+        cameraArray = imgArray[:, :, :, :].copy()
+        #cameraArray = imgArray[::2, :, :, :].copy()
+        #semanticArray = imgArray[1::2, :, :, :].copy()
+        
+        #semanticArray1 = semanticArray[..., 0]
+        #semanticArray1_2 = semanticArray1.astype(np.uint32)
+        
+        mySvm.planeTexArray.setRamImage(cameraArray)
+        #mySvm.semanticTexArray.setRamImage(semanticArray1_2)
+        
+        mySvm.planeTexArray.setRamImage(cameraArray)
+        #mySvm.semanticTexArray.setRamImage(semanticArray1_2)
 
-        cv.imshow("depth_derivlon", depthmapnp)
+        #cv.imshow("depth_derivlon", depthmapnp)
         cv.imshow("image_deirvlon 0", imgs[0])
         cv.imshow("image_deirvlon 1", imgs[1])
         cv.imshow("image_deirvlon 2", imgs[2])
@@ -621,13 +540,14 @@ def PacketProcessing(packetInit: dict, q: queue):
         cv.waitKey(1)
 
         if len(depthmapnp) != 0 :
-            worldpointList = DepthToPoint.toPoints(packetInit["lidarChs"],packetInit["lidarRes"],
+            worldpointList = DepthToPoint.toPoints(mySvm.lidarChs,mySvm.lidarRes,
                                 30,360 ,depthmapnp)
         
         # print(worldpointList[1])
-        ProcSvmFromPackets(mySvm, 
-                        packetInit['numLidars'], packetInit["lidarRes"], packetInit["lidarChs"], 
-                        packetInit['imageWidth'], packetInit["imageHeight"], imgs, worldpointList)
+        #ProcSvmFromPackets(mySvm, 
+        #                packetInit['numLidars'], mySvm.lidarRes, mySvm.lidarChs, 
+        #                packetInit['imageWidth'], mySvm.imageHeight, imgs, worldpointList)
+        
         
 if __name__ == "__main__":
     

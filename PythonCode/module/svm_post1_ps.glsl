@@ -138,6 +138,7 @@ void main()
         case 3: pos.z = 50; break;
         case 4: pos.z = 99.0; break;
     }
+    pos.z = 0;
 
     int overlapIndex[4] = {int(camId0), int(camId1), 0, 0};
     const int debugMode = 0;
