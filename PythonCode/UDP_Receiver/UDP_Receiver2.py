@@ -358,17 +358,6 @@ bufferSize = 60000
 
 bytesToSend = b'17'# str.encode(msgFromServer)
 
-# Create a datagram socket
-UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-
-
-# Bind to address and ip
-UDPServerSocket.bind((localIP, localPort))
-
-
-print("UDP server up and listening")
-
-mySvm.isInitializedUDP = True
 
 color_map = [(50, 50, 50),
              (130, 120, 110),
@@ -710,9 +699,7 @@ def ProcSvmFromPackets(base, fullPackets, packetNum,
         
     cv.waitKey(1)
     
-timeout = 5
-UDPServerSocket.settimeout(timeout)
-def ReceiveData():
+def ReceiveData(UDPServerSocket):
     # Listen for incoming datagrams
     while(True):
 
@@ -892,7 +879,21 @@ def ReceiveData():
                     #continue
 
 if __name__ == "__main__":
-    t = threading.Thread(target=ReceiveData, args=())
+    
+    # Create a datagram socket
+    UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+
+    timeout = 10
+    UDPServerSocket.settimeout(timeout)
+    # Bind to address and ip
+    UDPServerSocket.bind((localIP, localPort))
+
+
+    print("UDP server up and listening")
+
+    mySvm.isInitializedUDP = True
+
+    t = threading.Thread(target=ReceiveData, args=(UDPServerSocket))
     t.start()
 
     print("SVM Start!")
