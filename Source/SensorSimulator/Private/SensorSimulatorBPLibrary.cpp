@@ -182,6 +182,10 @@ auto LidarScan = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPoin
 auto LidarScan360 = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPointCloudComponent* lidarPointCloud,
 	USceneCaptureComponent2D* sceneCaptureF, USceneCaptureComponent2D* sceneCaptureL, USceneCaptureComponent2D*
 	sceneCaptureB, USceneCaptureComponent2D* sceneCaptureR,
+	//USceneCaptureComponent2D* segF,
+	//USceneCaptureComponent2D* segR,
+	//USceneCaptureComponent2D* segB,
+	//USceneCaptureComponent2D* segL,
 	FAsyncDelegate360 Out, FLidarSensorOut360& sensorOut360,
 	const float vFovSDeg, const float vFovEDeg, const int lidarChannels, const float hfovDeg, const int lidarResolution, const float lidarRange)
 {
@@ -387,12 +391,16 @@ void USensorSimulatorBPLibrary::LidarSensorAsyncScan360(
 		// pointer parameters are safe because they are conservative
 		AsyncTask(ENamedThreads::GameThread, [&lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL, sceneCaptureB, sceneCaptureR,
 			Out, &sensorOut, asyncScan, vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange]() { // AnyHiPriThreadNormalTask
-				LidarScan360(lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL, sceneCaptureB, sceneCaptureR, Out, sensorOut,
+				LidarScan360(lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL, sceneCaptureB, sceneCaptureR, 
+				//segF, segR, segB, segL
+				Out, sensorOut,
 				vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange);
 			});
 	}
 	else {
-		LidarScan360(lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL,sceneCaptureB,sceneCaptureR, Out, sensorOut,
+		LidarScan360(lidarPoints, lidarPointCloud, sceneCaptureF, sceneCaptureL,sceneCaptureB,sceneCaptureR,
+			//segF, segR, segB, segL,
+			Out, sensorOut,
 			vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange);
 	}
 }
@@ -426,6 +434,7 @@ void USensorSimulatorBPLibrary::LidarSensorAsyncScan4(
 			vFovSDeg, vFovEDeg, lidarChannels, hfovDeg, lidarResolution, lidarRange);
 	}
 }
+
 
 
 
@@ -540,19 +549,19 @@ void USensorSimulatorBPLibrary::SensorOutToBytes360(const FLidarSensorOut360 & l
 		bytesColorMap += lidarSensorOuts.colorArrayOutF.Num() * 4;
 		bytesInfo += FString("ColorF") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.colorArrayOutF.Num()) + FString("//");
 	}
-	if (lidarSensorOuts.colorArrayOutB.Num() > 0) {
-		bytesColorMap += lidarSensorOuts.colorArrayOutB.Num() * 4;
-		bytesInfo += FString("ColorB") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.colorArrayOutB.Num()) + FString("//");
-	}
 	if (lidarSensorOuts.colorArrayOutR.Num() > 0) {
 		bytesColorMap += lidarSensorOuts.colorArrayOutR.Num() * 4;
 		bytesInfo += FString("ColorR") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.colorArrayOutR.Num()) + FString("//");
+	}
+	if (lidarSensorOuts.colorArrayOutB.Num() > 0) {
+		bytesColorMap += lidarSensorOuts.colorArrayOutB.Num() * 4;
+		bytesInfo += FString("ColorB") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.colorArrayOutB.Num()) + FString("//");
 	}
 	if (lidarSensorOuts.colorArrayOutL.Num() > 0) {
 		bytesColorMap += lidarSensorOuts.colorArrayOutL.Num() * 4;
 		bytesInfo += FString("ColorL") + FString::FromInt(index) + FString(":") + FString::FromInt(lidarSensorOuts.colorArrayOutL.Num()) + FString("//");
 	}
-
+	
 	//uint32 bytesCount = bytesPoints + bytesColorMap * 4 + bytesDepthMap;
 	//uint32 bytesCount = bytesColorMap * 4 + bytesDepthMap;
 	uint32 bytesCount = bytesColorMap + bytesDepthMap;
@@ -571,19 +580,20 @@ void USensorSimulatorBPLibrary::SensorOutToBytes360(const FLidarSensorOut360 & l
 		memcpy(&bytes[offsetColorMap + bytesDepthMap], &lidarSensorOuts.colorArrayOutF[0], lidarSensorOuts.colorArrayOutF.Num() * 4);
 		offsetColorMap += lidarSensorOuts.colorArrayOutF.Num() * 4;
 	}
-	if (lidarSensorOuts.colorArrayOutB.Num() > 0) {
-		memcpy(&bytes[offsetColorMap + bytesDepthMap], &lidarSensorOuts.colorArrayOutB[0], lidarSensorOuts.colorArrayOutB.Num() * 4);
-		offsetColorMap += lidarSensorOuts.colorArrayOutB.Num() * 4;
-	}
 	if (lidarSensorOuts.colorArrayOutR.Num() > 0) {
 		memcpy(&bytes[offsetColorMap + bytesDepthMap], &lidarSensorOuts.colorArrayOutR[0], lidarSensorOuts.colorArrayOutR.Num() * 4);
 		offsetColorMap += lidarSensorOuts.colorArrayOutR.Num() * 4;
 	}
-	if (lidarSensorOuts.colorArrayOutL.Num() > 0) {
+	if (lidarSensorOuts.colorArrayOutB.Num() > 0) {
+		memcpy(&bytes[offsetColorMap + bytesDepthMap], &lidarSensorOuts.colorArrayOutB[0], lidarSensorOuts.colorArrayOutB.Num() * 4);
+		offsetColorMap += lidarSensorOuts.colorArrayOutB.Num() * 4;
+	}
+	if(lidarSensorOuts.colorArrayOutL.Num() > 0) {
 		memcpy(&bytes[offsetColorMap + bytesDepthMap], &lidarSensorOuts.colorArrayOutL[0], lidarSensorOuts.colorArrayOutL.Num() * 4);
 		offsetColorMap += lidarSensorOuts.colorArrayOutL.Num() * 4;
 	}
-	//off set ´õÇØÁÖ¸é¼­ ÀÌµ¿
+
+	//off set ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸é¼­ ï¿½Ìµï¿½
 
 	//TArray<TArray<uint8>> bytePackets;
 	int numPackets = (int)ceil((float)bytesCount / (float)packetBytes);
