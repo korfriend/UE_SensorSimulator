@@ -378,9 +378,9 @@ class Bag(nn.Module):
 
 if __name__ == "__main__":
 
-    x = torch.rand(4, 64, 32, 64).cuda()
-    y = torch.rand(4, 64, 32, 64).cuda()
-    z = torch.rand(4, 64, 32, 64).cuda()
-    net = PagFM(64, 16, with_channel=True).cuda()
+    x = torch.rand(4, 64, 32, 64).cpu()
+    y = torch.rand(4, 64, 32, 64).cpu()
+    z = torch.rand(4, 64, 32, 64).cpu()
+    net = PagFM(64, 16, with_channel=True).cpu()
 
     out = net(x, y)
