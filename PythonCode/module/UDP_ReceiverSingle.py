@@ -64,6 +64,27 @@ def ReceiveData(packetInit: dict, q: queue):
             packetInit["imageHeight"] = int.from_bytes(packet[36:40], "little")
             packetInit["Fov"] = int.from_bytes(packet[40:44], "little")
 
+            packetInit["CameraF_y"] = int.from_bytes(packet[44:48], "little", signed=True)
+            packetInit["CameraR_y"] = int.from_bytes(packet[48:52], "little", signed=True)
+            packetInit["CameraB_y"] = int.from_bytes(packet[52:56], "little", signed=True)
+            packetInit["CameraL_y"] = int.from_bytes(packet[56:60], "little", signed=True)
+            
+            packetInit["CameraF_location_x"] = int.from_bytes(packet[60:64], "little", signed=True)
+            packetInit["CameraR_location_x"] = int.from_bytes(packet[64:68], "little", signed=True)
+            packetInit["CameraB_location_x"] = int.from_bytes(packet[68:72], "little", signed=True)
+            packetInit["CameraL_location_x"] = int.from_bytes(packet[72:76], "little", signed=True)
+
+            packetInit["CameraF_location_y"] = int.from_bytes(packet[76:80], "little", signed=True)
+            packetInit["CameraR_location_y"] = int.from_bytes(packet[80:84], "little", signed=True)
+            packetInit["CameraB_location_y"] = int.from_bytes(packet[84:88], "little", signed=True)
+            packetInit["CameraL_location_y"] = int.from_bytes(packet[88:92], "little", signed=True)
+
+            packetInit["CameraF_location_z"] = int.from_bytes(packet[92:96], "little", signed=True)
+            packetInit["CameraR_location_z"] = int.from_bytes(packet[96:100], "little", signed=True)
+            packetInit["CameraB_location_z"] = int.from_bytes(packet[100:104], "little", signed=True)
+            packetInit["CameraL_location_z"] = int.from_bytes(packet[104:108], "little", signed=True)
+
+
             print("Num Packets : {}".format(packetInit["packetNum"]))
             print("Bytes of Points : {}".format(packetInit["bytesPoints"]))
             print("Bytes of RGB map : {}".format(packetInit["bytesRGBmap"]))
@@ -74,6 +95,13 @@ def ReceiveData(packetInit: dict, q: queue):
             print("Camera Width : {}".format(packetInit["imageWidth"]))
             print("Camera Height : {}".format(packetInit["imageHeight"]))
             print("Camera Fov : {}".format(packetInit["Fov"]))
+            print("Camera rotate y: {}, {}, {}, {}".format(packetInit["CameraF_y"], packetInit["CameraR_y"], packetInit["CameraB_y"], packetInit["CameraL_y"]))
+            print("CameraF location: {}, {}, {}".format(packetInit["CameraF_location_x"], packetInit["CameraF_location_y"], packetInit["CameraF_location_z"]))
+            print("CameraR location: {}, {}, {}".format(packetInit["CameraR_location_x"], packetInit["CameraR_location_y"], packetInit["CameraR_location_z"]))
+            print("CameraB location: {}, {}, {}".format(packetInit["CameraB_location_x"], packetInit["CameraB_location_y"], packetInit["CameraB_location_z"]))
+            print("CameraL location: {}, {}, {}".format(packetInit["CameraL_location_x"], packetInit["CameraL_location_y"], packetInit["CameraL_location_z"]))
+
+
         else:
             if not packetInit:
                 continue

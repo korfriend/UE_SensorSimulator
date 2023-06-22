@@ -423,55 +423,35 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
 
     GeneratePointNode()
 
-    verFoV = 2 * math.atan(math.tan(150 * np.deg2rad(1) / 2) * (imageHeight / imageWidth)) * np.rad2deg(1)
+    camera_fov = packetInit["Fov"] # 150
+    verFoV = 2 * math.atan(math.tan(camera_fov * np.deg2rad(1) / 2) * (imageHeight / imageWidth)) * np.rad2deg(1)
     projMat = createOglProjMatrix(verFoV, imageWidth / imageHeight, 10, 100000)
 
     # LHS
     center_z = -0
-    # sensor_pos_array = [
-    #     p3d.Vec3(-400, 0, 40 - center_z),
-    #     p3d.Vec3(0, 180, 40 - center_z),
-    #     p3d.Vec3(400, 0, 40 - center_z),
-    #     p3d.Vec3(0, -180, 40 - center_z)
-    #     ]   ## 수정
-    # topview project 파라미터
-    # sensor_pos_array = [
-    #         p3d.Vec3(30, 0, 40 - center_z),
-    #         p3d.Vec3(0, 60, 40 - center_z),
-    #         p3d.Vec3(-40, 0, 40 - center_z),
-    #         p3d.Vec3(0, -80, 40 - center_z)
-    #         ]
-    # 아비커스 파라미터 원점 대칭
-    # sensor_pos_array = [
-    #         p3d.Vec3(640, -10, 161 - center_z),
-    #         p3d.Vec3(-155, 140, 216 - center_z),
-    #         p3d.Vec3(-399, 0, 125 - center_z),
-    #         p3d.Vec3(-155, -140, 216 - center_z)
-    #         ]
-    # sensor_rot_z_array = [0, 90, 180, -90]
 
     # sensor_pos_array = [
-    #         p3d.Vec3(0, 645, 216 - center_z),
-    #         p3d.Vec3(-140,-155, 216 - center_z),
-    #         p3d.Vec3(0,-400, 216 - center_z),
-    #         p3d.Vec3(140, -155, 216 - center_z),
-    #         ]
-
+    #     p3d.Vec3(340, 0, 236 - center_z),
+    #     p3d.Vec3(155, 140, 186 - center_z),
+    #     p3d.Vec3(-400, 0, 186 - center_z),
+    #     p3d.Vec3(155, -140, 146 - center_z),
+    # ]
     sensor_pos_array = [
-        p3d.Vec3(340, 0, 236 - center_z),
-        p3d.Vec3(155, 140, 186 - center_z),
-        p3d.Vec3(-400, 0, 186 - center_z),
-        p3d.Vec3(155, -140, 146 - center_z),
+        p3d.Vec3(packetInit["CameraF_location_x"], packetInit["CameraF_location_y"], packetInit["CameraF_location_z"]),
+        p3d.Vec3(packetInit["CameraR_location_x"], packetInit["CameraR_location_y"], packetInit["CameraR_location_z"]),
+        p3d.Vec3(packetInit["CameraB_location_x"], packetInit["CameraB_location_y"], packetInit["CameraB_location_z"]),
+        p3d.Vec3(packetInit["CameraL_location_x"], packetInit["CameraL_location_y"], packetInit["CameraL_location_z"])
     ]
 
-    sensor_rot_z_array = [0, 90, 180, -90]
+    sensor_rot_z_array = [0, 90, 180, -90] # F R B L
 
     # sensor_rot_z_array = [90, -90, 0, 180]
-    # todo 이정보가 들어가는 곳 착고 matrix 수정
+
     cam_pos = p3d.Vec3(0, 0, 250)
 
-    cam_rot_y_array = [-35, -43, -30, -43]
-
+    #cam_rot_y_array = [-35, -43, -30, -43]
+    cam_rot_y_array = [packetInit["CameraF_y"], packetInit["CameraR_y"], packetInit["CameraB_y"], packetInit["CameraL_y"]]
+    
     # LHS, RHS sameg
     sensorMatLHS_array = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
     imgIdx = 0
