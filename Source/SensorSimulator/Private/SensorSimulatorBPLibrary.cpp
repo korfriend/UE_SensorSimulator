@@ -641,7 +641,7 @@ void USensorSimulatorBPLibrary::SensorOutToBytes360(const FLidarSensorOut360 & l
 	}
 	//UE_LOG(LogTemp, Log, TEXT("%d"), static_cast<int32>(frameIndex));
 	//UE_LOG(LogTemp, Log, TEXT("hihi"));
-	GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::FromInt(testcount));
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::FromInt(testcount));
 	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Yellow, FString::FromInt(remainingBytes));
 	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Green, FString::FromInt(offset));
 }
