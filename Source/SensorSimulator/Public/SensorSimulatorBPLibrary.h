@@ -75,10 +75,18 @@ public:
 		TArray<uint8> ArrayOut;
 };
 
+USTRUCT(BlueprintType)
+struct FTArrayBytes 
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TArray<FBytes> FArrayOut;
+};
+
 DECLARE_DYNAMIC_DELEGATE_OneParam(FAsyncDelegate, FLidarSensorOut, SensorOut);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FAsyncDelegate360, FLidarSensorOut360, SensorOut360);
-
-
 
 UCLASS()
 
@@ -123,7 +131,9 @@ class USensorSimulatorBPLibrary : public UBlueprintFunctionLibrary
 	
 	UFUNCTION(BlueprintCallable, Category = "SensorSimulator", meta = (DisplayName = "SensorOutToBytes360", Keywords = "SensorOut360 to Bytes Array"))
 		static void SensorOutToBytes360(const FLidarSensorOut360& lidarSensorOuts,
-			TArray<FBytes>& bytePackets, FString& bytesInfo, int& bytesPoints, int& bytesColorMap,
+			//TArray<FBytes>& bytePackets,
+			FTArrayBytes& bytePackets,
+			FString& bytesInfo, int& bytesPoints, int& bytesColorMap,
 			int& bytesDepthMap, const int packetBytes);
 
 };

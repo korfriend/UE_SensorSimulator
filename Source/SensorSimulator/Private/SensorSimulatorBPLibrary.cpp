@@ -223,11 +223,15 @@ auto LidarScan360 = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarP
 	auto RenderTargetResourceB = textureRTB->GameThread_GetRenderTargetResource();
 	auto RenderTargetResourceR = textureRTR->GameThread_GetRenderTargetResource();
 
-	TArray<FColor> bufferF , bufferL, bufferB, bufferR;
-	sensorOut360.colorArrayOutF.Init(FColor(), texWidth * texHeight);
-	sensorOut360.colorArrayOutL.Init(FColor(), texWidth* texHeight);
-	sensorOut360.colorArrayOutB.Init(FColor(), texWidth* texHeight);
-	sensorOut360.colorArrayOutR.Init(FColor(), texWidth* texHeight);
+	TArray<FColor> bufferF, bufferL, bufferB, bufferR; 
+	if (sensorOut360.colorArrayOutF.Num() == 0) {
+		sensorOut360.colorArrayOutF.Init(FColor(), texWidth * texHeight);
+		sensorOut360.colorArrayOutL.Init(FColor(), texWidth* texHeight);
+		sensorOut360.colorArrayOutB.Init(FColor(), texWidth* texHeight);
+		sensorOut360.colorArrayOutR.Init(FColor(), texWidth* texHeight);
+		GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, FString::Printf(TEXT("created")));
+	}
+
 
 	if (RenderTargetResourceF) {
 		RenderTargetResourceF->ReadPixels(bufferF);
@@ -266,8 +270,11 @@ auto LidarScan360 = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarP
 	targetObjTypes.AddObjectTypesToQuery(ECC_Vehicle);
 	targetObjTypes.AddObjectTypesToQuery(ECC_Destructible);
 
-	sensorOut360.depthArrayOut360.Init(-1.f, lidarChannels * lidarResolution);
-
+	if (sensorOut360.depthArrayOut360.Num() == 0) {
+		sensorOut360.depthArrayOut360.Init(-1.f, lidarChannels* lidarResolution);
+		//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Green, FString::Printf(TEXT("created")));
+	}
+	
 	const float vRotDelta = fabs(vFovEDeg - vFovSDeg) / std::max((lidarChannels - 1), 1);
 	for (int chIdx = 0; chIdx < lidarChannels; chIdx++) {
 
@@ -368,6 +375,7 @@ auto LidarScan360 = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarP
 		}
 	);
 };
+
 void USensorSimulatorBPLibrary::LidarSensorAsyncScan360(
 	const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarPointCloudComponent* lidarPointCloud, 
 	USceneCaptureComponent2D* sceneCaptureF, USceneCaptureComponent2D* sceneCaptureL, 
@@ -437,8 +445,6 @@ void USensorSimulatorBPLibrary::LidarSensorAsyncScan4(
 
 
 
-
-
 void USensorSimulatorBPLibrary::ReadSemantic(USceneCaptureComponent2D* sceneCapture, TArray<FColor>& semanticArrayOut) {
 	UTextureRenderTarget2D* textureRT = sceneCapture->TextureTarget;
 	float texWidth = (float)textureRT->SizeX;
@@ -450,7 +456,6 @@ void USensorSimulatorBPLibrary::ReadSemantic(USceneCaptureComponent2D* sceneCapt
 	semanticArrayOut.Init(FColor(), texWidth * texHeight);
 	if (RenderTargetResource) {
 		RenderTargetResource->ReadPixels(buffer);
-
 		semanticArrayOut = buffer;
 	}
 }
@@ -526,7 +531,9 @@ void USensorSimulatorBPLibrary::SensorOutToBytes(const TArray<FLidarSensorOut>& 
 }
 
 void USensorSimulatorBPLibrary::SensorOutToBytes360(const FLidarSensorOut360 & lidarSensorOuts,
-	TArray<FBytes>& bytePackets, FString& bytesInfo, int& bytesPoints, int& bytesColorMap,
+	//TArray<FBytes>& bytePackets,
+	FTArrayBytes& bytePackets,
+	FString& bytesInfo, int& bytesPoints, int& bytesColorMap,
 	int& bytesDepthMap, const int packetBytes)
 {
 
@@ -593,22 +600,40 @@ void USensorSimulatorBPLibrary::SensorOutToBytes360(const FLidarSensorOut360 & l
 		offsetColorMap += lidarSensorOuts.colorArrayOutL.Num() * 4;
 	}
 
-	//off set �����ָ鼭 �̵�
+	//off set 더해주면서 이동
 
 	//TArray<TArray<uint8>> bytePackets;
 	int numPackets = (int)ceil((float)bytesCount / (float)packetBytes);
-	bytePackets.Init(FBytes(), numPackets);
+
+	//bytePackets.ArrayOut.Reset();
+	if (bytePackets.FArrayOut.Num() == 0) {
+		bytePackets.FArrayOut.Init(FBytes(), numPackets);
+		GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::Printf(TEXT("created")));
+	}
+
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::Printf(TEXT("created")));
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::Printf(TEXT("passed")));
+
+	
 	int remainingBytes = bytesCount;
 	int offset = 0;
 	int packetIndex = 0;
-	for (FBytes& packet : bytePackets) {
+
+	int testcount = 0;
+	for (FBytes& packet : bytePackets.FArrayOut){
 		int packetSize = std::min(packetBytes, remainingBytes);
 		//packet.ArrayOut.Init(0, packetSize + 8);
-		packet.ArrayOut.Init(0, packetSize + 4);
+		if (packet.ArrayOut.Num() == 0) {
+			packet.ArrayOut.Init(0, packetSize + 4);
+			//testcount++;
+		}
+	/*	else {
+			testcount = 0;
+		}*/
 		//*(int*)&packet.ArrayOut[0] = GFrameNumber;
 		*(int*)&packet.ArrayOut[0] = packetIndex++;
 		//*(int*)&packet.ArrayOut[4] = packetIndex++;
-		memcpy(&packet.ArrayOut[4], &bytes[offset], packetSize);
+        memcpy(&packet.ArrayOut[4], &bytes[offset], packetSize);
 
 		remainingBytes -= packetSize;
 		offset += packetSize;
@@ -616,7 +641,7 @@ void USensorSimulatorBPLibrary::SensorOutToBytes360(const FLidarSensorOut360 & l
 	}
 	//UE_LOG(LogTemp, Log, TEXT("%d"), static_cast<int32>(frameIndex));
 	//UE_LOG(LogTemp, Log, TEXT("hihi"));
-	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::FromInt(frameIndex));
+	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::FromInt(testcount));
 	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Yellow, FString::FromInt(remainingBytes));
 	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Green, FString::FromInt(offset));
 }
