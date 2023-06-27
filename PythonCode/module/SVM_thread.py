@@ -207,6 +207,8 @@ class SurroundView(ShowBase):
         self.quad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.quad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.quad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
+        self.quad.setShaderInput("img_w", 256)
+        self.quad.setShaderInput("img_h", 256)
 
         def GeneratePlaneNode(svmBase):
             # shader setting for SVM
@@ -247,6 +249,8 @@ class SurroundView(ShowBase):
             svmBase.plane = p3d.NodePath(geomNode)
             svmBase.plane.setTwoSided(True)
             svmBase.plane.setShader(svmBase.planeShader)
+            svmBase.plane.setShaderInput("img_w", 256)
+            svmBase.plane.setShaderInput("img_h", 256)
 
             # the following mat4 array does not work...
             # matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
@@ -603,6 +607,13 @@ def InitSVM(
     base.plane.setShaderInput("semanticImgs", base.semanticTexArray)
 
     base.sensorMatLHS_array = sensorMatLHS_array
+
+    base.plane.setShaderInput("img_w", imageWidth)
+    base.plane.setShaderInput("img_h", imageHeight)
+
+    base.quad.setShaderInput("img_w", imageWidth)
+    base.quad.setShaderInput("img_h", imageHeight)
+
     print("Texture Initialized!")
 
 
