@@ -22,7 +22,7 @@ uniform isampler2DArray semanticImgs;
 uniform int img_w;
 uniform int img_h;
 
-vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, float weightId0, int debugMode) {
+vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, float weightId0, int semantic, int debugMode) {
     const float bias0 = weightId0;//1.0;
     const float bias1 = 1.0 - weightId0;//1.0;
 
@@ -71,14 +71,19 @@ vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, 
         }
     }
     else {
-        vec4 img1 = texture(cameraImgs, vec3(1 - texPos0.x, 1 - texPos0.y, camId0));
-        vec4 img2 = texture(cameraImgs, vec3(1 - texPos1.x, 1 - texPos1.y, camId1));
-        colorOut = w0 * img1 + w1 * img2;
-
         ivec2 texIdx2d0 = ivec2((1 - texPos0.x) * img_w + 0.5, (1 - texPos0.y) * img_h + 0.5);
         int semantic0 = texelFetch(semanticImgs, ivec3(texIdx2d0, camId0), 0).r;
         ivec2 texIdx2d1 = ivec2((1 - texPos1.x) * img_w + 0.5, (1 - texPos1.y) * img_h + 0.5);
         int semantic1 = texelFetch(semanticImgs, ivec3(texIdx2d1, camId1), 0).r;
+
+        vec4 img1 = texture(cameraImgs, vec3(1 - texPos0.x, 1 - texPos0.y, camId0));
+        vec4 img2 = texture(cameraImgs, vec3(1 - texPos1.x, 1 - texPos1.y, camId1));
+        
+        if(semantic0 != semantic) img1 = vec4(0, 0, 0, 1);
+        if(semantic1 != semantic) img2 = vec4(0, 0, 0, 1);
+        
+        colorOut = w0 * img1 + w1 * img2;
+
         //if(pos.z == 100.0) {
         //    if(semantic0 != 3 && semantic1 != 3) {
         //        colorOut = vec4(0, 0, 0, 1);
@@ -161,7 +166,13 @@ void main()
                 vec4 imagePos = viewProjs[camId] * vec4(pos, 1.0);
                 vec2 imagePos2D = imagePos.xy / imagePos.w;
                 vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
-                colorOut = texture(cameraImgs, vec3(1 - texPos0.x, 1 - texPos0.y, camId));
+                vec4 img0 = texture(cameraImgs, vec3(1 - texPos0.x, 1 - texPos0.y, camId));
+
+                ivec2 texIdx2d0 = ivec2((1 - texPos0.x) * img_w + 0.5, (1 - texPos0.y) * img_h + 0.5);
+                int semantic0 = texelFetch(semanticImgs, ivec3(texIdx2d0, camId), 0).r;
+                if(semantic0 != semantic) img0 = vec4(0, 0, 0, 1);
+
+                colorOut = img0;
             }
             break;
         }
@@ -177,19 +188,19 @@ void main()
             float w30 = 0.5;
             switch(enc) {
                 case 1: {
-                    colorOut = blendArea(0, 1, pos, viewProjs, enc, w01, debugMode);
+                    colorOut = blendArea(0, 1, pos, viewProjs, enc, w01, semantic, debugMode);
                     break;
                 }
                 case 4: {
-                    colorOut = blendArea(1, 2, pos, viewProjs, enc, w12, debugMode);
+                    colorOut = blendArea(1, 2, pos, viewProjs, enc, w12, semantic, debugMode);
                     break;
                 }
                 case 7: {
-                    colorOut = blendArea(2, 3, pos, viewProjs, enc, w23, debugMode);
+                    colorOut = blendArea(2, 3, pos, viewProjs, enc, w23, semantic, debugMode);
                     break;
                 }
                 case 3: {
-                    colorOut = blendArea(3, 0, pos, viewProjs, enc, w30, debugMode);
+                    colorOut = blendArea(3, 0, pos, viewProjs, enc, w30, semantic, debugMode);
                     break;
                 }
             }
