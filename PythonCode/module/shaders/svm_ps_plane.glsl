@@ -25,8 +25,8 @@ uniform isampler2DArray semanticImgs;
 out uvec4 frag_color0;
 layout(location = 1) out uvec4 frag_color1;
 
-const int img_w = 1280;
-const int img_h = 1280;
+uniform int img_w;
+uniform int img_h;
 
 void main() {
     vec3 pos = worldcoord;

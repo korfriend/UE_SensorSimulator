@@ -19,6 +19,8 @@ uniform sampler2D texGeoInfo2; // from sceneObj
 uniform sampler2DArray cameraImgs;
 uniform isampler2DArray semanticImgs;
 
+uniform int img_w;
+uniform int img_h;
 
 vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, float weightId0, int debugMode) {
     const float bias0 = weightId0;//1.0;
@@ -73,9 +75,9 @@ vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, 
         vec4 img2 = texture(cameraImgs, vec3(1 - texPos1.x, 1 - texPos1.y, camId1));
         colorOut = w0 * img1 + w1 * img2;
 
-        ivec2 texIdx2d0 = ivec2((1 - texPos0.x) * 1280 + 0.5, (1 - texPos0.y) * 1280 + 0.5);
+        ivec2 texIdx2d0 = ivec2((1 - texPos0.x) * img_w + 0.5, (1 - texPos0.y) * img_h + 0.5);
         int semantic0 = texelFetch(semanticImgs, ivec3(texIdx2d0, camId0), 0).r;
-        ivec2 texIdx2d1 = ivec2((1 - texPos1.x) * 1280 + 0.5, (1 - texPos1.y) * 1280 + 0.5);
+        ivec2 texIdx2d1 = ivec2((1 - texPos1.x) * img_w + 0.5, (1 - texPos1.y) * img_h + 0.5);
         int semantic1 = texelFetch(semanticImgs, ivec3(texIdx2d1, camId1), 0).r;
         //if(pos.z == 100.0) {
         //    if(semantic0 != 3 && semantic1 != 3) {
