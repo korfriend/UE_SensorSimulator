@@ -1,10 +1,11 @@
-import socket
+import math
 import queue
-import numpy as np
+import socket
 import time
-import DepthToPoint
-import cv2 as cv
 
+import cv2 as cv
+import DepthToPoint
+import numpy as np
 
 color_map = [
     (128, 64, 128),
@@ -68,7 +69,7 @@ def ReceiveData(packetInit: dict, q: queue):
             packetInit["CameraR_y"] = int.from_bytes(packet[48:52], "little", signed=True)
             packetInit["CameraB_y"] = int.from_bytes(packet[52:56], "little", signed=True)
             packetInit["CameraL_y"] = int.from_bytes(packet[56:60], "little", signed=True)
-            
+
             packetInit["CameraF_location_x"] = int.from_bytes(packet[60:64], "little", signed=True)
             packetInit["CameraR_location_x"] = int.from_bytes(packet[64:68], "little", signed=True)
             packetInit["CameraB_location_x"] = int.from_bytes(packet[68:72], "little", signed=True)
@@ -84,6 +85,7 @@ def ReceiveData(packetInit: dict, q: queue):
             packetInit["CameraB_location_z"] = int.from_bytes(packet[100:104], "little", signed=True)
             packetInit["CameraL_location_z"] = int.from_bytes(packet[104:108], "little", signed=True)
 
+            packetInit["isFisheye"] = int.from_bytes(packet[108:112], "little", signed=True)
 
             print("Num Packets : {}".format(packetInit["packetNum"]))
             print("Bytes of Points : {}".format(packetInit["bytesPoints"]))
@@ -121,6 +123,8 @@ def ReceiveData(packetInit: dict, q: queue):
                 lidarChs = packetInit["lidarChs"]
                 imageWidth = packetInit["imageWidth"]
                 imageHeight = packetInit["imageHeight"]
+                fov = packetInit["Fov"]
+                isFisheye = packetInit["isFisheye"]
 
                 if len(packetDict[key]) == packetNum:
                     fullPackets = b"".join([packetDict[frame][i] for i in range(packetNum)])
@@ -148,6 +152,36 @@ def ReceiveData(packetInit: dict, q: queue):
                             dtype=np.uint8,
                         )
                         imgnp = imgnp.reshape((imageHeight, imageWidth, 4))
+
+                        # if isFisheye == 1:
+                        #     fx = imageWidth / math.tan(0.5 * fov) * 2
+                        #     fy = imageHeight / math.tan(0.5 * fov) * 2
+                        #     cx = imageWidth / 2
+                        #     cy = imageHeight / 2
+
+                        #     K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
+
+                        #     K1 = 0.0
+                        #     K2 = 0.0
+                        #     K3 = 0.0
+                        #     K4 = 0.0
+                        #     K5 = 0.0
+
+                        #     D = np.array([K2, K3, K4, K5])
+                        #     if K1 != 0:
+                        #         D /= K1
+
+                        #     # undistorted = cv.fisheye.undistortImage(distorted, K, D)
+                        #     P = cv.fisheye.estimateNewCameraMatrixForUndistortRectify(
+                        #         K, D, (imageWidth, imageHeight), np.eye(3), balance=1.0
+                        #     )
+                        #     map1, map2 = cv.fisheye.initUndistortRectifyMap(
+                        #         K, D, np.eye(3), P, (imageWidth, imageHeight), cv.CV_16SC2
+                        #     )
+                        #     imgnp = cv.remap(
+                        #         imgnp, map1, map2, interpolation=cv.INTER_LINEAR, borderMode=cv.BORDER_CONSTANT
+                        #     )
+
                         segnp = segnp.reshape((imageHeight, imageWidth, 4))
                         imgs.append(imgnp)
 
