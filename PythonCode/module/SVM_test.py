@@ -1,33 +1,26 @@
-import socket
-
-import threading
+import json
+import math
 import queue
-import cv2 as cv
-import numpy as np
-import time
-import DepthToPoint
-import threading
+import random
 import socket
 import struct
+import threading
+import time
 
-import numpy as np
-import math
 import cv2 as cv
-from direct.showbase.ShowBase import ShowBase
-from panda3d.core import Shader, ShaderAttrib
-import panda3d.core as p3d
-import panda3d
-from draw_sphere import draw_sphere
-from direct.filter.FilterManager import FilterManager
-
-import json
 import keyboard
-
+import numpy as np
+import panda3d
+import panda3d.core as p3d
+from direct.filter.FilterManager import FilterManager
+from direct.showbase.ShowBase import ShowBase
 from matplotlib import cm
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-import random
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
+from panda3d.core import Shader, ShaderAttrib
 
+import DepthToPoint
 import UDP_ReceiverSingle
+from draw_sphere import draw_sphere
 
 # from semantic_label_generator import get_semantic_label
 
@@ -111,7 +104,9 @@ class SurroundView(ShowBase):
         tex1.clear()
         tex2.clear()
         self.buffer1.addRenderTexture(
-            tex1, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color
+            tex1,
+            p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram,
+            p3d.GraphicsOutput.RTP_color,
         )
         # I dont know why the RTP_aux_rgba_x with RTM_copy_ram (F_rgba32i?!) affects incorrect render-to-texture result.
         # so, tricky.. the tex2 only contains pos info (no need to readback to RAM)
@@ -177,7 +172,9 @@ class SurroundView(ShowBase):
 
         draw_sphere(self, 500000, (0, 0, 0), (1, 1, 1, 1))
         self.sphereShader = Shader.load(
-            Shader.SL_GLSL, vertex="./shaders/sphere_vs.glsl", fragment="./shaders/sphere_ps.glsl"
+            Shader.SL_GLSL,
+            vertex="./shaders/sphere_vs.glsl",
+            fragment="./shaders/sphere_ps.glsl",
         )
         self.sphere.setShader(self.sphereShader)
         self.sphere.reparentTo(self.renderObj)
@@ -186,16 +183,24 @@ class SurroundView(ShowBase):
         self.quad = manager.renderSceneInto(colortex=None)  # make dummy texture... for post processing...
         # mySvm.quad = manager.renderQuadInto(colortex=tex)
         self.quad.setShader(
-            Shader.load(Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post1_ps.glsl")
+            Shader.load(
+                Shader.SL_GLSL,
+                vertex="./shaders/post1_vs.glsl",
+                fragment="./shaders/svm_post1_ps.glsl",
+            )
         )
         self.quad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.quad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.quad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
+        self.quad.setShaderInput("img_w", 256)
+        self.quad.setShaderInput("img_h", 256)
 
         def GeneratePlaneNode(svmBase):
             # shader setting for SVM
             svmBase.planeShader = Shader.load(
-                Shader.SL_GLSL, vertex="./shaders/svm_vs.glsl", fragment="./shaders/svm_ps_plane.glsl"
+                Shader.SL_GLSL,
+                vertex="./shaders/svm_vs.glsl",
+                fragment="./shaders/svm_ps_plane.glsl",
             )
             vdata = p3d.GeomVertexData("triangle_data", p3d.GeomVertexFormat.getV3t2(), p3d.Geom.UHStatic)
             vdata.setNumRows(4)  # optional for performance enhancement!
@@ -227,6 +232,8 @@ class SurroundView(ShowBase):
             svmBase.plane = p3d.NodePath(geomNode)
             svmBase.plane.setTwoSided(True)
             svmBase.plane.setShader(svmBase.planeShader)
+            svmBase.plane.setShaderInput("img_w", 256)
+            svmBase.plane.setShaderInput("img_h", 256)
 
             # the following mat4 array does not work...
             # matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
@@ -244,7 +251,12 @@ class SurroundView(ShowBase):
             svmBase.quad.setShaderInput("cameraImgs", svmBase.planeTexArray)
             svmBase.sphere.setShaderInput("cameraImgs", svmBase.planeTexArray)
 
-            svmBase.camPositions = [p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f()]
+            svmBase.camPositions = [
+                p3d.LVector4f(),
+                p3d.LVector4f(),
+                p3d.LVector4f(),
+                p3d.LVector4f(),
+            ]
             svmBase.plane.setShaderInput("camPositions", svmBase.camPositions)
 
             # initial setting like the above code! (for resource optimization)
@@ -297,16 +309,24 @@ class SurroundView(ShowBase):
 
     def shaderRecompile(self):
         self.planeShader = Shader.load(
-            Shader.SL_GLSL, vertex="./shaders/svm_vs.glsl", fragment="./shaders/svm_ps_plane.glsl"
+            Shader.SL_GLSL,
+            vertex="./shaders/svm_vs.glsl",
+            fragment="./shaders/svm_ps_plane.glsl",
         )
         self.plane.setShader(mySvm.planeShader)
         self.sphereShader = Shader.load(
-            Shader.SL_GLSL, vertex="./shaders/sphere_vs.glsl", fragment="./shaders/sphere_ps.glsl"
+            Shader.SL_GLSL,
+            vertex="./shaders/sphere_vs.glsl",
+            fragment="./shaders/sphere_ps.glsl",
         )
         self.sphere.setShader(self.sphereShader)
 
         self.quad.setShader(
-            Shader.load(Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post1_ps.glsl")
+            Shader.load(
+                Shader.SL_GLSL,
+                vertex="./shaders/post1_vs.glsl",
+                fragment="./shaders/svm_post1_ps.glsl",
+            )
         )
 
 
@@ -362,6 +382,18 @@ def GeneratePointNode():
 
 def UpdateResource(task):
     PacketProcessing(mySvm.packetInit, mySvm.qQ)
+
+    screenshot = mySvm.win.getScreenshot()  # get the screenshot
+    img = np.frombuffer(screenshot.getRamImageAs("RGB").getData(), dtype=np.uint8)  # convert the screenshot to an array
+    img = img.reshape((screenshot.getYSize(), screenshot.getXSize(), 3))  # reshape the array
+    img = cv.cvtColor(img, cv.COLOR_RGB2BGR)  # convert the color space
+    img = cv.flip(img, 0)  # flip the array
+    mask = cv.inRange(img, (0, 0, 0), (0, 0, 0))
+    dst = cv.inpaint(img, mask, 3, cv.INPAINT_TELEA)
+    cv.imshow("img", img)
+    cv.imshow("mask", mask)
+    cv.imshow("dst", dst)
+
     return task.cont
 
 
@@ -375,7 +407,22 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
         # col major in pand3d core but memory convention is based on the conventional row major
         # GLM_DEPTH_CLIP_SPACE == GLM_DEPTH_ZERO_TO_ONE version
         projMat = p3d.LMatrix4f(
-            1.0 / tanHalfFovx, 0, 0, 0, 0, 1.0 / tanHalfFovy, 0, 0, 0, 0, f / (n - f), -f * n / (f - n), 0, 0, -1, 0
+            1.0 / tanHalfFovx,
+            0,
+            0,
+            0,
+            0,
+            1.0 / tanHalfFovy,
+            0,
+            0,
+            0,
+            0,
+            f / (n - f),
+            -f * n / (f - n),
+            0,
+            0,
+            -1,
+            0,
         )
         projMat.transpose_in_place()
         return projMat
@@ -423,57 +470,63 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
 
     GeneratePointNode()
 
-    verFoV = 2 * math.atan(math.tan(150 * np.deg2rad(1) / 2) * (imageHeight / imageWidth)) * np.rad2deg(1)
+    camera_fov = packetInit["Fov"]  # 150
+    verFoV = 2 * math.atan(math.tan(camera_fov * np.deg2rad(1) / 2) * (imageHeight / imageWidth)) * np.rad2deg(1)
     projMat = createOglProjMatrix(verFoV, imageWidth / imageHeight, 10, 100000)
 
     # LHS
     center_z = -0
-    # sensor_pos_array = [
-    #     p3d.Vec3(-400, 0, 40 - center_z),
-    #     p3d.Vec3(0, 180, 40 - center_z),
-    #     p3d.Vec3(400, 0, 40 - center_z),
-    #     p3d.Vec3(0, -180, 40 - center_z)
-    #     ]   ## 수정
-    # topview project 파라미터
-    # sensor_pos_array = [
-    #         p3d.Vec3(30, 0, 40 - center_z),
-    #         p3d.Vec3(0, 60, 40 - center_z),
-    #         p3d.Vec3(-40, 0, 40 - center_z),
-    #         p3d.Vec3(0, -80, 40 - center_z)
-    #         ]
-    # 아비커스 파라미터 원점 대칭
-    # sensor_pos_array = [
-    #         p3d.Vec3(640, -10, 161 - center_z),
-    #         p3d.Vec3(-155, 140, 216 - center_z),
-    #         p3d.Vec3(-399, 0, 125 - center_z),
-    #         p3d.Vec3(-155, -140, 216 - center_z)
-    #         ]
-    # sensor_rot_z_array = [0, 90, 180, -90]
 
     # sensor_pos_array = [
-    #         p3d.Vec3(0, 645, 216 - center_z),
-    #         p3d.Vec3(-140,-155, 216 - center_z),
-    #         p3d.Vec3(0,-400, 216 - center_z),
-    #         p3d.Vec3(140, -155, 216 - center_z),
-    #         ]
-
+    #     p3d.Vec3(340, 0, 236 - center_z),
+    #     p3d.Vec3(155, 140, 186 - center_z),
+    #     p3d.Vec3(-400, 0, 186 - center_z),
+    #     p3d.Vec3(155, -140, 146 - center_z),
+    # ]
     sensor_pos_array = [
-        p3d.Vec3(340, 0, 236 - center_z),
-        p3d.Vec3(155, 140, 186 - center_z),
-        p3d.Vec3(-400, 0, 186 - center_z),
-        p3d.Vec3(155, -140, 146 - center_z),
+        p3d.Vec3(
+            packetInit["CameraF_location_x"],
+            packetInit["CameraF_location_y"],
+            packetInit["CameraF_location_z"],
+        ),
+        p3d.Vec3(
+            packetInit["CameraR_location_x"],
+            packetInit["CameraR_location_y"],
+            packetInit["CameraR_location_z"],
+        ),
+        p3d.Vec3(
+            packetInit["CameraB_location_x"],
+            packetInit["CameraB_location_y"],
+            packetInit["CameraB_location_z"],
+        ),
+        p3d.Vec3(
+            packetInit["CameraL_location_x"],
+            packetInit["CameraL_location_y"],
+            packetInit["CameraL_location_z"],
+        ),
     ]
 
-    sensor_rot_z_array = [0, 90, 180, -90]
+    sensor_rot_z_array = [0, 90, 180, -90]  # F R B L
 
     # sensor_rot_z_array = [90, -90, 0, 180]
-    # todo 이정보가 들어가는 곳 착고 matrix 수정
+
     cam_pos = p3d.Vec3(0, 0, 250)
 
-    cam_rot_y_array = [-35, -43, -30, -43]
+    # cam_rot_y_array = [-35, -43, -30, -43]
+    cam_rot_y_array = [
+        packetInit["CameraF_y"],
+        packetInit["CameraR_y"],
+        packetInit["CameraB_y"],
+        packetInit["CameraL_y"],
+    ]
 
     # LHS, RHS sameg
-    sensorMatLHS_array = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
+    sensorMatLHS_array = [
+        p3d.LMatrix4f(),
+        p3d.LMatrix4f(),
+        p3d.LMatrix4f(),
+        p3d.LMatrix4f(),
+    ]
     imgIdx = 0
 
     for sensorPos, camPos in zip(sensor_pos_array, base.camPositions):
@@ -529,11 +582,37 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
     base.plane.setShaderInput("semanticImgs", base.semanticTexArray)
 
     base.sensorMatLHS_array = sensorMatLHS_array
+
+    base.plane.setShaderInput("img_w", imageWidth)
+    base.plane.setShaderInput("img_h", imageHeight)
+
+    base.quad.setShaderInput("img_w", imageWidth)
+    base.quad.setShaderInput("img_h", imageHeight)
+
     print("Texture Initialized!")
 
 
-def ProcSvmFromPackets(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, segs, worldpointlist):
-    InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, worldpointlist)
+def ProcSvmFromPackets(
+    base,
+    numLidars,
+    lidarRes,
+    lidarChs,
+    imageWidth,
+    imageHeight,
+    imgs,
+    segs,
+    worldpointlist,
+):
+    InitSVM(
+        base,
+        numLidars,
+        lidarRes,
+        lidarChs,
+        imageWidth,
+        imageHeight,
+        imgs,
+        worldpointlist,
+    )
 
     numMaxPoints = lidarRes * lidarChs * numLidars
 
@@ -567,7 +646,7 @@ def ProcSvmFromPackets(base, numLidars, lidarRes, lidarChs, imageWidth, imageHei
 
     imgs_ = np.array(EH_img)
     segs_ = np.array(SM_img).astype(np.uint32)
-    segs_ = segs_.reshape((4, 1280, 1280, 4))
+    segs_ = segs_.reshape((4, imageHeight, imageWidth, 4))
     # dst[:, :, 0] = src      # B-채널만 가져오기
     segs_1 = segs_[:, :, :, 0].copy()
     base.planeTexArray.setRamImage(imgs_)
@@ -639,7 +718,17 @@ def PacketProcessing(packetInit: dict, q: queue):
 
     cv.waitKey(1)
 
-    ProcSvmFromPackets(mySvm, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, segRaw, worldpointList)
+    ProcSvmFromPackets(
+        mySvm,
+        numLidars,
+        lidarRes,
+        lidarChs,
+        imageWidth,
+        imageHeight,
+        imgs,
+        segRaw,
+        worldpointList,
+    )
 
 
 if __name__ == "__main__":
