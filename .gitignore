@@ -45,6 +45,11 @@ Intermediate/
 *.out
 *.app
 
-# Ignore Python cache and model files
+# Python cache
 __pycache__/
+
+# PyTorch models
 *.pt
+
+# Data
+data/
