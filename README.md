@@ -16,9 +16,3 @@ Unreal Engine Plugin for Synthetic Data Generation
 3.  Browse to your project folder (typically found at Documents/Unreal Project/{Your Project Root})
 4.  Copy _Plugins_ folder into your Project root.
 5.  Plugin should be now ready to use.
-
-## Models
-
-| Model (BoatSim) |                                            PIDNet-S                                            |                                            PIDNet-M                                            |                                            PIDNet-L                                            |
-| :-------------: | :--------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------: |
-|      Link       | [download](https://drive.google.com/file/d/1f0RJba8qHIWmdv36KxXoFBkY-KlfjsmO/view?usp=sharing) | [download](https://drive.google.com/file/d/1lUK5tzC8f_laYqCVWhDXURFsvtZkT4Q_/view?usp=sharing) | [download](https://drive.google.com/file/d/1cUHsCKfRxp4EfLhd25L_bTXFXjxAyMGd/view?usp=sharing) |
