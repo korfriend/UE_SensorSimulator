@@ -1,11 +1,27 @@
-import math
+import json
+import os
 
 import cv2 as cv
 import numpy as np
 import panda3d.core as p3d
 from direct.filter.FilterManager import FilterManager
 from direct.showbase.ShowBase import ShowBase
+from direct.task import Task
 from panda3d.core import Shader
+
+with open("./data/source_video/Calibration_Simul.json") as f:
+    calibration = json.load(f)
+
+boat_breadth = calibration["boat_type"]["custom_breadth"] * 100
+boat_length = calibration["boat_type"]["custom_length"] * 100
+
+extrinsic_parameter = calibration["extrinsic_parameter"]["cameras"]
+del extrinsic_parameter[3:5]
+extrinsic_parameter[2], extrinsic_parameter[3] = extrinsic_parameter[3], extrinsic_parameter[2]
+for extrinsic in extrinsic_parameter:
+    extrinsic["location"]["translation_x"] *= 100
+    extrinsic["location"]["translation_y"] *= 100
+    extrinsic["location"]["translation_z"] *= 100
 
 K1 = 1.281584985127447
 K2 = 0.170043067138006
@@ -17,44 +33,9 @@ img_width = 1920
 img_height = 1080
 fx = 345.12136354806347
 fy = 346.09009197978003
-cx = 959.5  # - img_width / 2
-cy = 539.5  # - img_height / 2
+cx = 959.5
+cy = 539.5
 skew_c = 0
-
-extrinsic_parameters = [
-    {  # front
-        "pos_x": 0.0,  # -0.1,
-        "pos_y": -640.0,  # -6.45,
-        "pos_z": -227.0,  # -1.82,
-        "euler_x": 59.6,
-        "euler_y": 1.9,
-        "euler_z": 1.1,
-    },
-    {  # right
-        "pos_x": 210.0,  # 1.4,
-        "pos_y": -100.0,  # 1.55,
-        "pos_z": -155.0,  # -2.16,
-        "euler_x": 44.9,
-        "euler_y": 2.4001,
-        "euler_z": 92.9,
-    },
-    {  # rear
-        "pos_x": 0.0,  # 0.0,
-        "pos_y": 550.5,  # 3.99,
-        "pos_z": -188.0,  # -1.25,
-        "euler_x": 43.2,
-        "euler_y": -1.2,
-        "euler_z": 181.8,
-    },
-    {  # left
-        "pos_x": -198.0,  # -1.4,
-        "pos_y": -100.0,  # 1.55,
-        "pos_z": -155.0,  # -2.16,
-        "euler_x": 45.0,
-        "euler_y": 1,
-        "euler_z": -89.6,
-    },
-]
 
 winSizeX = 1024
 winSizeY = 1024
@@ -71,8 +52,6 @@ class SurroundView(ShowBase):
         self.render.setAntialias(p3d.AntialiasAttrib.MAuto)
         self.cam.setPos(0, 0, -4000)
         self.cam.lookAt(p3d.LPoint3f(0, 0, 0), p3d.LVector3f(0, -1, 0))
-
-        # self.disableMouse()
 
         self.renderObj = p3d.NodePath("fgRender")
         self.renderSVM = p3d.NodePath("bgRender")
@@ -110,9 +89,7 @@ class SurroundView(ShowBase):
         tex2.setClearColor(p3d.Vec4(0, 0, 0, 0))
         tex1.clear()
         tex2.clear()
-        self.buffer1.addRenderTexture(
-            tex1, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color
-        )
+        self.buffer1.addRenderTexture(tex1, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color)
         # I dont know why the RTP_aux_rgba_x with RTM_copy_ram (F_rgba32i?!) affects incorrect render-to-texture result.
         # so, tricky.. the tex2 only contains pos info (no need to readback to RAM)
         self.buffer1.addRenderTexture(
@@ -158,28 +135,8 @@ class SurroundView(ShowBase):
         self.boat.setHpr(0, -90, 180)
 
         bbox = self.boat.getTightBounds()
-        scale = abs(extrinsic_parameters[0]["pos_y"] - extrinsic_parameters[2]["pos_y"]) / (bbox[1].y - bbox[0].y)
+        scale = boat_length / (bbox[1].y - bbox[0].y)
         self.boat.setScale(scale)
-
-        bbox = self.boat.getTightBounds()
-        origin = (bbox[0] + bbox[1]) / 2
-
-        pos_x = 0
-        for extrinsic_parameter in extrinsic_parameters:
-            pos_x += extrinsic_parameter["pos_x"]
-        pos_x /= len(extrinsic_parameters)
-
-        pos_y = 0
-        for extrinsic_parameter in extrinsic_parameters:
-            pos_y += extrinsic_parameter["pos_y"]
-        pos_y /= len(extrinsic_parameters)
-
-        pos_z = 0
-        for extrinsic_parameter in extrinsic_parameters:
-            pos_z += extrinsic_parameter["pos_z"]
-        pos_z /= len(extrinsic_parameters)
-
-        self.boat.setPos(pos_x - origin.x, pos_y - origin.y, pos_z - origin.z)
 
         # bbox = self.boat.getTightBounds()
         # print(bbox)
@@ -244,9 +201,7 @@ class SurroundView(ShowBase):
                 svmBase.quad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
 
             svmBase.planeTexArray = p3d.Texture()
-            svmBase.planeTexArray.setup2dTextureArray(
-                img_width, img_height, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
-            )
+            svmBase.planeTexArray.setup2dTextureArray(img_width, img_height, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
             svmBase.plane.setShaderInput("cameraImgs", svmBase.planeTexArray)
             svmBase.quad.setShaderInput("cameraImgs", svmBase.planeTexArray)
 
@@ -256,9 +211,7 @@ class SurroundView(ShowBase):
             # initial setting like the above code! (for resource optimization)
             # svmBase.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
             svmBase.semanticTexArray = p3d.Texture()
-            svmBase.semanticTexArray.setup2dTextureArray(
-                img_width, img_height, 4, p3d.Texture.T_int, p3d.Texture.F_r32i
-            )
+            svmBase.semanticTexArray.setup2dTextureArray(img_width, img_height, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
             print(img_width, img_height)
             svmBase.plane.setShaderInput("semanticImgs", svmBase.semanticTexArray)
             svmBase.quad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
@@ -307,7 +260,79 @@ class SurroundView(ShowBase):
         self.quad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps_real.glsl"))
 
 
-def get_projection_matrix(fx, fy, skew_c, cx, cy, img_width, img_height, near_p, far_p):
+def make_extrinsic_matrix(extrinsic):
+    defaultYaw = 0
+    camera_position = int(extrinsic["camera_position"])
+    if camera_position == 1:
+        print("position is 1")
+        defaultYaw = 0
+    elif camera_position == 3 or camera_position == 5:
+        print("position is 3 or 5")
+        defaultYaw = -90
+    elif camera_position == 2 or camera_position == 4:
+        print("position is 2 or 4")
+        defaultYaw = 90
+    elif camera_position == 6:
+        print("position is 6")
+        defaultYaw = 180
+    rotation = [-extrinsic["rotation"]["pitch"], extrinsic["rotation"]["roll"], -extrinsic["rotation"]["yaw"] - defaultYaw]
+    translation = [extrinsic["location"]["translation_x"], extrinsic["location"]["translation_y"], extrinsic["location"]["translation_z"]]
+    rotation_matrix0 = euler_to_matrix(rotation)
+    rotation_matrix1 = euler_to_matrix([0, 0, -90])
+    rotation_matrix = rotation_matrix1 @ rotation_matrix0
+    return translation, rotation_matrix
+
+
+def euler_to_matrix(euler_angle):
+    """
+    :param euler_angle: [x,y,z] in degree
+    :return: rotation matrix
+    """
+    # calculate rotation about the x-axis
+    R_x = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, np.cos(np.deg2rad(-euler_angle[0])), -np.sin(np.deg2rad(-euler_angle[0]))],
+            [0.0, np.sin(np.deg2rad(-euler_angle[0])), np.cos(np.deg2rad(-euler_angle[0]))],
+        ],
+        dtype=float,
+    )
+    # calculate rotation about the y-axis
+    R_y = np.array(
+        [
+            [np.cos(np.deg2rad(-euler_angle[1])), 0.0, np.sin(np.deg2rad(-euler_angle[1]))],
+            [0.0, 1.0, 0.0],
+            [-np.sin(np.deg2rad(-euler_angle[1])), 0.0, np.cos(np.deg2rad(-euler_angle[1]))],
+        ],
+        dtype=float,
+    )
+    # calculate rotation about the z-axis
+    R_z = np.array(
+        [
+            [np.cos(np.deg2rad(-euler_angle[2])), -np.sin(np.deg2rad(-euler_angle[2])), 0.0],
+            [np.sin(np.deg2rad(-euler_angle[2])), np.cos(np.deg2rad(-euler_angle[2])), 0.0],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=float,
+    )
+    return R_z @ R_y @ R_x
+
+
+def make_view_matrix(translation, rotation_matrix):
+    # Create a 4x4 identity matrix
+    extrinsic_matrix = np.eye(4)
+
+    # Insert rotation_matrix into the extrinsic_matrix
+    extrinsic_matrix[:3, :3] = rotation_matrix
+
+    # Insert translation into the last row of the extrinsic_matrix
+    extrinsic_matrix[3, :3] = translation
+
+    # Return the inverse of the extrinsic_matrix to get the view matrix
+    return np.linalg.inv(extrinsic_matrix)
+
+
+def make_projection_matrix(fx, fy, skew_c, cx, cy, img_width, img_height, near_p, far_p):
     q = far_p / (near_p - far_p)
     qn = far_p * near_p / (near_p - far_p)
 
@@ -333,110 +358,8 @@ def get_projection_matrix(fx, fy, skew_c, cx, cy, img_width, img_height, near_p,
     return projection_matrix
 
 
-def computeLookAtMatrix(eye, target, up):
-    forward = target - eye
-    forward.normalized()
-
-    right = forward.cross(up)
-    right.normalized()
-
-    up_actual = right.cross(forward)
-    up_actual.normalized()
-
-    viewMatrix = p3d.LMatrix4f()
-    viewMatrix[0][0] = right.x
-    viewMatrix[1][0] = right.y
-    viewMatrix[2][0] = right.z
-    viewMatrix[0][1] = up_actual.x
-    viewMatrix[1][1] = up_actual.y
-    viewMatrix[2][1] = up_actual.z
-    viewMatrix[0][2] = -forward.x
-    viewMatrix[1][2] = -forward.y
-    viewMatrix[2][2] = -forward.z
-    viewMatrix[3][0] = -right.dot(eye)
-    viewMatrix[3][1] = -up_actual.dot(eye)
-    viewMatrix[3][2] = forward.dot(eye)
-
-    # viewMatrix.transposeInPlace()
-    return viewMatrix
-
-
-def MakeQt(euler):
-    x = math.radians(euler.x)
-    y = math.radians(euler.y)
-    z = math.radians(euler.z)
-
-    # http://www.mathworks.com/matlabcentral/fileexchange/
-    # 	20696-function-to-convert-between-dcm-euler-angles-quaternions-and-euler-vectors/
-    # 	content/SpinCalc.m
-
-    c1 = math.cos(x / 2)
-    c2 = math.cos(y / 2)
-    c3 = math.cos(z / 2)
-
-    s1 = math.sin(x / 2)
-    s2 = math.sin(y / 2)
-    s3 = math.sin(z / 2)
-
-    q = p3d.LQuaternionf()
-    q.x = s1 * c2 * c3 + c1 * s2 * s3
-    q.y = c1 * s2 * c3 - s1 * c2 * s3
-    q.z = c1 * c2 * s3 + s1 * s2 * c3
-    q.w = c1 * c2 * c3 - s1 * s2 * s3
-
-    return q
-
-
-def get_view_matrix(pos_x, pos_y, pos_z, euler_x, euler_y, euler_z):
-    # euler_x = math.radians(euler_x)
-    # euler_y = math.radians(euler_y)
-    # euler_z = math.radians(euler_z)
-
-    translation_matrix = p3d.LMatrix4f.translateMat(pos_x, pos_y, pos_z)
-    S = p3d.LMatrix4f.scaleMat(1, 1, -1)
-
-    q = MakeQt(p3d.LVector3f(euler_x, euler_y, euler_z))
-    matrix = p3d.Mat4()
-    # matrix.setQuat(q)
-    q.extract_to_matrix(matrix)
-    obj = p3d.NodePath("MyTest")
-
-    # Rotate the object using Euler angles
-    heading = euler_y  # Rotation around the Y-axis (yaw)
-    pitch = euler_x  # Rotation around the X-axis
-    roll = euler_z  # Rotation around the Z-axis
-
-    obj.setHpr(heading, pitch, roll)
-    matR = p3d.LMatrix4f(obj.getMat())
-
-    # RS = matrix * R
-    # RS.invertInPlace()
-
-    world_matrix = matR * translation_matrix
-    view = world_matrix.xformVec(p3d.LVector3f(0, 0, 1))
-    pos = world_matrix.xformPoint(p3d.LVector3f(0, 0, 0))
-    up = world_matrix.xformVec(p3d.LVector3f(0, 1, 0))
-
-    return computeLookAtMatrix(pos, pos + view, up)
-
-
-# def get_view_matrix(pos_x, pos_y, pos_z, euler_x, euler_y, euler_z):
-#
-#    # Create the rotation matrix
-#    mat = p3d.Mat3()
-#    mat.set_hpr(euler_x, euler_y, euler_z)
-#
-#    # Convert to a 4x4 matrix
-#    mat4 = p3d.Mat4(mat)
-#    mat4.set_row(3, (0, 0, 0, 1))  # Set the bottom row
-#
-#    view_matrix = translation_matrix * mat4
-#    view_matrix.invertInPlace()
-#
-
-
 def InitSVM(base, imageWidth, imageHeight):
-    projMat = get_projection_matrix(fx, fy, skew_c, cx, cy, imageWidth, imageHeight, 10, 10000)
+    matProj = make_projection_matrix(fx, fy, skew_c, cx, cy, imageWidth, imageHeight, 10, 10000)
     # projMat.transposeInPlace()
 
     matViews = []
@@ -522,25 +445,16 @@ def InitSVM(base, imageWidth, imageHeight):
     matViews.append(matViewLeft)
 
     matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
-    for i, extrinsic in enumerate(extrinsic_parameters):
-        # viewMat = get_view_matrix(**extrinsic)
-        # viewProjMat = viewMat * projMat
-        viewProjMat = matViews[i] * projMat
+    for i, extrinsic in enumerate(extrinsic_parameter):
+        # translation, rotation_matrix = make_extrinsic_matrix(extrinsic)
+        # matView = make_view_matrix(translation, rotation_matrix)
+        # matView = p3d.LMatrix4f(*matView.flatten())
+        # matViewProj = matView * matProj
+        matViewProj = matViews[i] * matProj
+        matViewProjs[i] = matViewProj
 
-        matViewProjs[i] = viewProjMat
-
-        base.plane.setShaderInput("matViewProj" + str(i), viewProjMat)
-        # print("plane.setShaderInput")
-        base.quad.setShaderInput("matViewProj" + str(i), viewProjMat)
-        # print("plane.setShaderInput")
-
-    # base.plane.setShaderInput("matViewProjs", matViewProjs)
-    # base.planePnm = p3d.PNMImage()
-    # for i in range(4):
-    #    base.planeTexs[i].setup2dTexture(
-    #        imageWidth, imageHeight, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
-    #    base.plane.setShaderInput(
-    #        'myTexture' + str(i), base.planeTexs[i])
+        base.plane.setShaderInput("matViewProj" + str(i), matViewProj)
+        base.quad.setShaderInput("matViewProj" + str(i), matViewProj)
 
     base.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
     base.plane.setShaderInput("cameraImgs", base.planeTexArray)
@@ -551,17 +465,47 @@ def InitSVM(base, imageWidth, imageHeight):
     print("Texture Initialized!")
 
 
-def undistort_image(image):
-    K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
-    D = np.array([K2, K3, K4, K5]) / K1
+base_path = "./data/ws_segmenet"
+camera_positions = ["front", "right", "rear", "left"]
+image_paths = {position: sorted(os.listdir(os.path.join(base_path, position, "images"))) for position in camera_positions}
+semantic_paths = {position: sorted(os.listdir(os.path.join(base_path, position, "pseudo_color_prediction"))) for position in camera_positions}
+num_images = len(image_paths["front"])
 
-    h, w = image.shape[:2]
-    R = np.eye(3)
-    P = cv.fisheye.estimateNewCameraMatrixForUndistortRectify(K, D, (w, h), R, balance=1.0)
-    mapx, mapy = cv.fisheye.initUndistortRectifyMap(K, D, R, P, (w, h), cv.CV_16SC2)
-    undistorted = cv.remap(image, mapx, mapy, cv.INTER_LINEAR)
+current_idx = 0
 
-    return undistorted
+
+def loadNextImage(task):
+    global current_idx
+
+    imgs = []
+    semantics = []
+
+    for position in camera_positions:
+        # Load image
+        img = cv.imread(os.path.join(base_path, position, "images", image_paths[position][current_idx]))
+        img = cv.resize(img, (img_width, img_height))
+        img = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
+        imgs.append(img)
+
+        # Load semantic image
+        semantic = cv.imread(os.path.join(base_path, position, "pseudo_color_prediction", semantic_paths[position][current_idx]))
+        semantic = cv.resize(semantic, (img_width, img_height))
+        semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
+        semantics.append(semantic)
+
+    imgnpArray = np.array(imgs).astype(np.uint8)
+    imgArray = imgnpArray.reshape((4, img_width, img_height, 4))
+    cameraArray = imgArray[:, :, :, :].copy()
+    semanticArray = np.array(semantics).astype(np.int32)
+
+    mySvm.planeTexArray.setRamImage(cameraArray)
+    mySvm.semanticTexArray.setRamImage(semanticArray)
+
+    current_idx += 1
+    if current_idx >= num_images:
+        current_idx = 0  # Reset the index to loop back to the first image
+
+    return Task.cont
 
 
 if __name__ == "__main__":
@@ -573,72 +517,6 @@ if __name__ == "__main__":
 
     InitSVM(mySvm, img_width, img_height)
 
-    front = cv.imread("./front.png")
-    right = cv.imread("./right.png")
-    rear = cv.imread("./rear.png")
-    left = cv.imread("./left.png")
-    front = cv.resize(front, (1920, 1080))
-    front4 = cv.cvtColor(
-        front,
-        cv.COLOR_BGR2BGRA,
-    )
-    # cv.imshow("TEST",front)
-    # cv.waitKey(1)
-    right = cv.resize(right, (1920, 1080))
-    right4 = cv.cvtColor(
-        right,
-        cv.COLOR_BGR2BGRA,
-    )
-    rear = cv.resize(rear, (1920, 1080))
-    rear4 = cv.cvtColor(
-        rear,
-        cv.COLOR_BGR2BGRA,
-    )
-    left = cv.resize(left, (1920, 1080))
-    left4 = cv.cvtColor(
-        left,
-        cv.COLOR_BGR2BGRA,
-    )
-
-    # ufront = undistort_image(front)
-    # uright = undistort_image(right)
-    # urear = undistort_image(rear)
-    # uleft = undistort_image(left)
-
-    # cv.imwrite("front_undistort.png", ufront)
-    # cv.imwrite("right_undistort.png", uright)
-
-    front_semantic = cv.imread("./front_semantic.png")
-    right_semantic = cv.imread("./right_semantic.png")
-    rear_semantic = cv.imread("./rear_semantic.png")
-    left_semantic = cv.imread("./left_semantic.png")
-    front_semantic = cv.resize(front_semantic, (1920, 1080))
-    front_semantic = cv.cvtColor(
-        front_semantic,
-        cv.COLOR_BGR2GRAY,
-    )
-    right_semantic = cv.resize(right_semantic, (1920, 1080))
-    right_semantic = cv.cvtColor(
-        right_semantic,
-        cv.COLOR_BGR2GRAY,
-    )
-    rear_semantic = cv.resize(rear_semantic, (1920, 1080))
-    rear_semantic = cv.cvtColor(
-        rear_semantic,
-        cv.COLOR_BGR2GRAY,
-    )
-    left_semantic = cv.resize(left_semantic, (1920, 1080))
-    left_semantic = cv.cvtColor(
-        left_semantic,
-        cv.COLOR_BGR2GRAY,
-    )
-
-    imgnpArray = np.array([front4, right4, rear4, left4]).astype(np.uint8)
-    imgArray = imgnpArray.reshape((4, 1920, 1080, 4))
-    cameraArray = imgArray[:, :, :, :].copy()
-    semanticArray = np.array([front_semantic, right_semantic, rear_semantic, left_semantic]).astype(np.int32)
-
-    mySvm.planeTexArray.setRamImage(cameraArray)
-    mySvm.semanticTexArray.setRamImage(semanticArray)
+    mySvm.taskMgr.add(loadNextImage, "loadNextImageTask", sort=1, uponDeath=exit)
 
     mySvm.run()
