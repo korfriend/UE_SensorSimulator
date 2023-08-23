@@ -1,6 +1,6 @@
-import math
 import queue
 import socket
+import struct
 import time
 
 import cv2 as cv
@@ -103,7 +103,6 @@ def ReceiveData(packetInit: dict, q: queue):
             print("CameraB location: {}, {}, {}".format(packetInit["CameraB_location_x"], packetInit["CameraB_location_y"], packetInit["CameraB_location_z"]))
             print("CameraL location: {}, {}, {}".format(packetInit["CameraL_location_x"], packetInit["CameraL_location_y"], packetInit["CameraL_location_z"]))
 
-
         else:
             if not packetInit:
                 continue
@@ -116,15 +115,15 @@ def ReceiveData(packetInit: dict, q: queue):
             for key in list(packetDict.keys()):
                 packetNum = packetInit["packetNum"]
                 # bytesPoints = packetInit["bytesPoints"]
-                # bytesDepthmap = packetInit["bytesDepthmap"]
-                # bytesRGBmap = packetInit["bytesRGBmap"]
+                bytesDepthmap = packetInit["bytesDepthmap"]
+                bytesRGBmap = packetInit["bytesRGBmap"]
                 # numLidars = packetInit["numLidars"]
                 lidarRes = packetInit["lidarRes"]
                 lidarChs = packetInit["lidarChs"]
                 imageWidth = packetInit["imageWidth"]
                 imageHeight = packetInit["imageHeight"]
-                fov = packetInit["Fov"]
-                isFisheye = packetInit["isFisheye"]
+                # fov = packetInit["Fov"]
+                # isFisheye = packetInit["isFisheye"]
 
                 if len(packetDict[key]) == packetNum:
                     fullPackets = b"".join([packetDict[frame][i] for i in range(packetNum)])
@@ -133,24 +132,20 @@ def ReceiveData(packetInit: dict, q: queue):
                     segs = []
                     segr = []
                     offset = 0
-                    depthMapBytes = lidarRes * lidarChs * 4
 
-                    depthmapnp = np.array(fullPackets[offset : offset + lidarRes * lidarChs], dtype=np.float32)
-                    depthmapnp = depthmapnp.reshape((lidarChs, lidarRes, 1))
+                    depthmap = struct.unpack(str(lidarRes * lidarChs) + "f", fullPackets[offset : offset + bytesDepthmap])
+                    depthmapnp = np.array(depthmap, dtype=np.float32)
+                    depthmapnp = depthmapnp.reshape((lidarChs, lidarRes))
+
                     worldpointList = DepthToPoint.toPoints(lidarChs, lidarRes, 30, 360, depthmapnp)
 
-                    offsetImg = depthMapBytes + offset
-                    imgBytes = imageWidth * imageHeight * 4
+                    offsetImg = bytesDepthmap + offset
+                    imgBytes = bytesRGBmap // (4 + 4)
                     dummyByte = 0
 
-                    for i in range(4):
-                        imgnp = np.array(
-                            fullPackets[offsetImg + dummyByte : offsetImg + dummyByte + imgBytes], dtype=np.uint8
-                        )
-                        segnp = np.array(
-                            fullPackets[offsetImg + dummyByte + imgBytes : offsetImg + dummyByte + imgBytes + imgBytes],
-                            dtype=np.uint8,
-                        )
+                    for _ in range(4):
+                        imgnp = np.array(fullPackets[offsetImg + dummyByte : offsetImg + dummyByte + imgBytes], dtype=np.uint8)
+                        segnp = np.array(fullPackets[offsetImg + dummyByte + imgBytes : offsetImg + dummyByte + imgBytes + imgBytes], dtype=np.uint8)
                         imgnp = imgnp.reshape((imageHeight, imageWidth, 4))
 
                         # if isFisheye == 1:
@@ -190,6 +185,7 @@ def ReceiveData(packetInit: dict, q: queue):
                             for k in range(3):
                                 color_img[:, :, k][segnp[:, :, 0] == j] = color[k]
 
+                        segnp = cv.cvtColor(segnp, cv.COLOR_BGRA2GRAY)
                         segs.append(color_img)
                         segr.append(segnp)
                         dummyByte = dummyByte + imgBytes + imgBytes
@@ -198,14 +194,14 @@ def ReceiveData(packetInit: dict, q: queue):
                     if q.qsize() > 9:
                         q.get()
                     # print(frame)
-                    # print("dic len defor : " , len(packetDict))
+                    # print("dic len defor : ", len(packetDict))
                     # print("send : ", key)
 
                     q.put([worldpointList, imgs, segs, segr])
                     del packetDict[key]
-                    # print("dic len after : " , len(packetDict))
+                    # print("dic len after : ", len(packetDict))
                     time.sleep(0.003)
 
-                # else :
-                # no full packet
-                # continue
+                # else:
+                #     # no full packet
+                #     continue
