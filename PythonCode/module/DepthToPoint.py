@@ -1,48 +1,46 @@
 import numpy as np
-import math
 
 
-# def toPoints(channel : int , res : int, vfov : float, hfov : float , depthmap : np.array()):
-#     point =  []
-#     print(depthmap.shape)
-#     for ch in range(channel):
-#         for r in range(res):
-#             raydepth = depthmap[ch][r]
-#             vangle = ch*(vfov / channel)
-#             hangle = r*(hfov / res)
-#             rayPointX = raydepth * math.sin(hangle) * math.cos(vangle) 
-#             rayPointY = raydepth * math.sin(hangle) * math.sin(vangle) 
-#             rayPointZ = raydepth * math.cos(hangle)
-            
-#             Point = [rayPointX,rayPointY,rayPointZ]
-#             point.append(Point)
 def toPoints(channel: int, res: int, vfov: float, hfov: float, depthmap: np.array):
-    point = []
-    #print(depthmap.shape)
-    for ch in range(channel):
-        for r in range(res):
-            raydepth = depthmap[ch][r]
-            vangle = math.radians(ch * (vfov / channel) - (vfov/2))  # vfov 범위를 -15 ~ 15도로 조정
-            hangle = math.radians(r * (hfov / res))
-            
-            projectRaydepth = raydepth*math.cos(vangle)
+    # Compute deltas
+    delta_deg = hfov / res
+    v_rot_delta = vfov / channel
 
-            rayPointX =projectRaydepth*math.cos(hangle)
-            rayPointY =projectRaydepth*math.sin(hangle)
-            rayPointZ =projectRaydepth*math.sin(vangle)
-            '''
-            vangle = math.radians(90 - ch * (vfov / channel) - (vfov/2))  # vfov 범위를 -15 ~ 15도로 조정
-            hangle = math.radians(r * (hfov / res))
-            rayPointX = raydepth * math.sin(vangle) * math.cos(hangle)
-            rayPointY = raydepth * math.sin(vangle) * math.sin(hangle)
-            rayPointZ = raydepth * math.cos(vangle)
-            '''
-            
+    results = []
 
-            Point = [(rayPointX, rayPointY, rayPointZ)]
-            point.append(Point)
-    return point
+    for ch_idx in range(channel):
+        v_rot_deg = -vfov / 2 + ch_idx * v_rot_delta
 
+        for x in range(res):
+            # Determine the depth from the depthmap
+            depth = depthmap[ch_idx, x]
 
+            # Check if depth is less than 0, if so, skip the current iteration
+            if depth < 0:
+                continue
 
+            rot_deg = delta_deg * x - hfov / 2
 
+            # Calculating the direction vector components using trigonometric functions
+            dir_x_ue = np.cos(np.radians(v_rot_deg)) * np.cos(np.radians(rot_deg))
+            dir_y_ue = np.cos(np.radians(v_rot_deg)) * np.sin(np.radians(rot_deg))
+            dir_z_ue = np.sin(np.radians(v_rot_deg))
+
+            # Convert from Unreal Engine coordinates to Panda3D coordinates
+            dir_x_pd = dir_y_ue
+            dir_y_pd = dir_x_ue
+            dir_z_pd = dir_z_ue
+
+            # Rotate around the z-axis by 90 degrees (counter-clockwise)
+            theta = np.radians(-90)
+            rotated_x = dir_x_pd * np.cos(theta) - dir_y_pd * np.sin(theta)
+            rotated_y = dir_x_pd * np.sin(theta) + dir_y_pd * np.cos(theta)
+
+            # Calculate the hit position based on the direction and depth
+            hit_position_x = rotated_x * depth
+            hit_position_y = rotated_y * depth
+            hit_position_z = dir_z_pd * depth
+
+            results.append((hit_position_x, hit_position_y, hit_position_z, depth))
+
+    return results

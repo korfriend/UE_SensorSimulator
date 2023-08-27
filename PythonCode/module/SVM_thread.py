@@ -1,66 +1,23 @@
-import socket
-
-import threading
-import queue
-import cv2 as cv
-import numpy as np
-import time
-import DepthToPoint
-import threading
-import socket
-import struct
-
-import numpy as np
 import math
+import queue
+import threading
+import time
+
 import cv2 as cv
-from direct.showbase.ShowBase import ShowBase
-from panda3d.core import Shader, ShaderAttrib
+import numpy as np
 import panda3d.core as p3d
-import panda3d
-from draw_sphere import draw_sphere
-from direct.filter.FilterManager import FilterManager
-
-import json
-import keyboard
-
-from matplotlib import cm
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-import random
-
 import UDP_ReceiverSingle
+from direct.filter.FilterManager import FilterManager
+from direct.showbase.ShowBase import ShowBase
+from scipy.sparse import lil_matrix
+from scipy.sparse.linalg import spsolve
 
-# from semantic_label_generator import get_semantic_label
-
-color_map = [
-    (50, 50, 50),
-    (130, 120, 110),
-    (255, 35, 35),
-    (35, 255, 35),
-    (35, 35, 255),
-    (190, 153, 153),
-    (153, 153, 153),
-    (250, 170, 30),
-    (220, 220, 0),
-    (107, 142, 35),
-    (152, 251, 152),
-    (70, 130, 180),
-    (220, 20, 60),
-    (255, 0, 0),
-    (0, 0, 142),
-    (0, 0, 70),
-    (0, 60, 100),
-    (0, 80, 100),
-    (0, 0, 230),
-    (119, 11, 32),
-]
-
-colormap = cm.get_cmap("viridis", 1000)
+# from draw_sphere import draw_sphere
 
 winSizeX = 1024
 winSizeY = 1024
 
 
-############ Main Thread
 class SurroundView(ShowBase):
     def __init__(self):
         super().__init__()
@@ -68,14 +25,13 @@ class SurroundView(ShowBase):
         winprops.setSize(winSizeX, winSizeX)
         self.win.requestProperties(winprops)
 
-        # ----------------카메라 프로퍼티
         self.render.setAntialias(p3d.AntialiasAttrib.MAuto)
         self.cam.setPos(0, 0, 3000)
         self.cam.lookAt(p3d.LPoint3f(0, 0, 0), p3d.LVector3f(0, 1, 0))
         self.camLens.setFov(60)
 
-        self.renderObj = p3d.NodePath("fgRender")  # ?
-        self.renderSVM = p3d.NodePath("bgRender")  # ?
+        self.renderObj = p3d.NodePath("fgRender")
+        self.renderSVM = p3d.NodePath("bgRender")
 
         # Set up the offscreen buffer
         fb_props = p3d.FrameBufferProperties()
@@ -100,7 +56,7 @@ class SurroundView(ShowBase):
         self.buffer1.setSort(10)
 
         # Create the render textures
-        tex1 = p3d.Texture()  # self.buffer1.getTexture() #
+        tex1 = p3d.Texture()  # self.buffer1.getTexture()
         tex2 = p3d.Texture()
         tex1.set_format(p3d.Texture.F_rgba32i)
         tex2.set_format(p3d.Texture.F_rgba32i)
@@ -118,15 +74,13 @@ class SurroundView(ShowBase):
         # I dont know why the RTP_aux_rgba_x with RTM_copy_ram (F_rgba32i?!) affects incorrect render-to-texture result.
         # so, tricky.. the tex2 only contains pos info (no need to readback to RAM)
         self.buffer1.addRenderTexture(
-            tex2,  # p3d.GraphicsOutput.RTM_bind_or_copy |
+            tex2,
             p3d.GraphicsOutput.RTM_bind_or_copy,
             p3d.GraphicsOutput.RTP_aux_rgba_0,
         )
 
         # Set up the offscreen camera
-        self.cam1 = self.makeCamera(
-            self.buffer1, scene=self.renderSVM, lens=self.cam.node().getLens()
-        )
+        self.cam1 = self.makeCamera(self.buffer1, scene=self.renderSVM, lens=self.cam.node().getLens())
         self.cam1.reparentTo(self.cam)
 
         # Set up a buffer for the first pass
@@ -146,31 +100,26 @@ class SurroundView(ShowBase):
             self.win,
         )
 
-        # self.buffer2 = self.win.makeTextureBuffer("buffer2", winSizeX, winSizeY) # this includes a default render target RTP_color
+        # self.buffer2 = self.win.makeTextureBuffer("buffer2", winSizeX, winSizeY)  # this includes a default render target RTP_color
         texP0 = p3d.Texture()
         texP0.set_format(p3d.Texture.F_rgba)
         texP0.set_component_type(p3d.Texture.T_unsigned_byte)
-        self.buffer2.addRenderTexture(
-            texP0, p3d.GraphicsOutput.RTM_bind_or_copy, p3d.GraphicsOutput.RTP_color
-        )
+        self.buffer2.addRenderTexture(texP0, p3d.GraphicsOutput.RTM_bind_or_copy, p3d.GraphicsOutput.RTP_color)
 
         self.buffer2.setClearColor(p3d.Vec4(0, 0, 0, 1))
         self.buffer2.setSort(0)
 
         # Set up a camera for the first pass
-        self.cam2 = self.makeCamera(
-            self.buffer2, scene=self.renderObj, lens=self.cam.node().getLens()
-        )
+        self.cam2 = self.makeCamera(self.buffer2, scene=self.renderObj, lens=self.cam.node().getLens())
         self.cam2.reparentTo(self.cam)
 
-        # 보트 로드
         self.boat = self.loader.loadModel("avikus_boat.glb")
-        self.boat.setScale(p3d.Vec3(30, 30, 30))
+        self.boat.setScale(100)
         self.boat.set_hpr(0, 90, 90)
         bbox = self.boat.getTightBounds()
         print("boat bound : ", bbox)
         center = (bbox[0] + bbox[1]) * 0.5
-        self.boat.setPos(-bbox[0].z)
+        self.boat.setPos(-center)
         self.boat.reparentTo(self.renderObj)
 
         self.axis = self.loader.loadModel("zup-axis")
@@ -183,23 +132,21 @@ class SurroundView(ShowBase):
         self.lidarChs = 0
         self.numLidars = 0
 
-        draw_sphere(self, 500000, (0, 0, 0), (1, 1, 1, 1))
-        self.sphereShader = Shader.load(
-            Shader.SL_GLSL,
-            vertex="./shaders/sphere_vs.glsl",
-            fragment="./shaders/sphere_ps.glsl",
-        )
-        self.sphere.setShader(self.sphereShader)
-        self.sphere.reparentTo(self.renderObj)
+        # draw_sphere(self, 500000, (0, 0, 0), (1, 1, 1, 1))
+        # self.sphereShader = p3d.Shader.load(
+        #     p3d.Shader.SL_GLSL,
+        #     vertex="./shaders/sphere_vs.glsl",
+        #     fragment="./shaders/sphere_ps.glsl",
+        # )
+        # self.sphere.setShader(self.sphereShader)
+        # self.sphere.reparentTo(self.renderObj)
 
         manager = FilterManager(self.win, self.cam)
-        self.quad = manager.renderSceneInto(
-            colortex=None
-        )  # make dummy texture... for post processing...
+        self.quad = manager.renderSceneInto(colortex=None)  # make dummy texture... for post processing...
         # mySvm.quad = manager.renderQuadInto(colortex=tex)
         self.quad.setShader(
-            Shader.load(
-                Shader.SL_GLSL,
+            p3d.Shader.load(
+                p3d.Shader.SL_GLSL,
                 vertex="./shaders/post1_vs.glsl",
                 fragment="./shaders/svm_post1_ps.glsl",
             )
@@ -212,21 +159,19 @@ class SurroundView(ShowBase):
 
         def GeneratePlaneNode(svmBase):
             # shader setting for SVM
-            svmBase.planeShader = Shader.load(
-                Shader.SL_GLSL,
+            svmBase.planeShader = p3d.Shader.load(
+                p3d.Shader.SL_GLSL,
                 vertex="./shaders/svm_vs.glsl",
                 fragment="./shaders/svm_ps_plane.glsl",
             )
-            vdata = p3d.GeomVertexData(
-                "triangle_data", p3d.GeomVertexFormat.getV3t2(), p3d.Geom.UHStatic
-            )
+            vdata = p3d.GeomVertexData("triangle_data", p3d.GeomVertexFormat.getV3t2(), p3d.Geom.UHStatic)
             vdata.setNumRows(4)  # optional for performance enhancement!
             vertex = p3d.GeomVertexWriter(vdata, "vertex")
             texcoord = p3d.GeomVertexWriter(vdata, "texcoord")
 
             bbox = svmBase.boat.getTightBounds()
             print("boat bound SVM: ", bbox)
-            self.waterZ = 110  # 0.2
+            self.waterZ = 110
             waterPlaneLength = 6000
             vertex.addData3(-waterPlaneLength, waterPlaneLength, self.waterZ)
             vertex.addData3(waterPlaneLength, waterPlaneLength, self.waterZ)
@@ -259,16 +204,14 @@ class SurroundView(ShowBase):
             # svmBase.planeTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
             for i in range(4):
                 svmBase.plane.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-                svmBase.sphere.setShaderInput("matViewProj" + str(i), p3d.Mat4())
+                # svmBase.sphere.setShaderInput("matViewProj" + str(i), p3d.Mat4())
                 svmBase.quad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
 
             svmBase.planeTexArray = p3d.Texture()
-            svmBase.planeTexArray.setup2dTextureArray(
-                256, 256, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
-            )
+            svmBase.planeTexArray.setup2dTextureArray(256, 256, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
             svmBase.plane.setShaderInput("cameraImgs", svmBase.planeTexArray)
             svmBase.quad.setShaderInput("cameraImgs", svmBase.planeTexArray)
-            svmBase.sphere.setShaderInput("cameraImgs", svmBase.planeTexArray)
+            # svmBase.sphere.setShaderInput("cameraImgs", svmBase.planeTexArray)
 
             svmBase.camPositions = [
                 p3d.LVector4f(),
@@ -281,12 +224,10 @@ class SurroundView(ShowBase):
             # initial setting like the above code! (for resource optimization)
             # svmBase.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
             svmBase.semanticTexArray = p3d.Texture()
-            svmBase.semanticTexArray.setup2dTextureArray(
-                256, 256, 4, p3d.Texture.T_int, p3d.Texture.F_r32i
-            )
+            svmBase.semanticTexArray.setup2dTextureArray(256, 256, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
             svmBase.plane.setShaderInput("semanticImgs", svmBase.semanticTexArray)
             svmBase.quad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
-            svmBase.sphere.setShaderInput("semanticImgs", svmBase.semanticTexArray)
+            # svmBase.sphere.setShaderInput("semanticImgs", svmBase.semanticTexArray)
 
             # zeros = np.ones((4, 256, 256), dtype=np.int32)
             # svmBase.semanticTexArray.setRamImage(zeros)
@@ -329,34 +270,18 @@ class SurroundView(ShowBase):
         return task.cont
 
     def shaderRecompile(self):
-        self.planeShader = Shader.load(
-            Shader.SL_GLSL,
-            vertex="./shaders/svm_vs.glsl",
-            fragment="./shaders/svm_ps_plane.glsl",
-        )
+        self.planeShader = p3d.Shader.load(p3d.Shader.SL_GLSL, vertex="./shaders/svm_vs.glsl", fragment="./shaders/svm_ps_plane.glsl")
         self.plane.setShader(mySvm.planeShader)
-        self.sphereShader = Shader.load(
-            Shader.SL_GLSL,
-            vertex="./shaders/sphere_vs.glsl",
-            fragment="./shaders/sphere_ps.glsl",
-        )
-        self.sphere.setShader(self.sphereShader)
+        # self.sphereShader = p3d.Shader.load(p3d.Shader.SL_GLSL, vertex="./shaders/sphere_vs.glsl", fragment="./shaders/sphere_ps.glsl")
+        # self.sphere.setShader(self.sphereShader)
 
-        self.quad.setShader(
-            Shader.load(
-                Shader.SL_GLSL,
-                vertex="./shaders/post1_vs.glsl",
-                fragment="./shaders/svm_post1_ps.glsl",
-            )
-        )
+        self.quad.setShader(p3d.Shader.load(p3d.Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post1_ps.glsl"))
 
 
 def GeneratePointNode():
     svmBase = mySvm
     # note: use Geom.UHDynamic instead of Geom.UHStatic (resource setting for immutable or dynamic)
-    vdata = p3d.GeomVertexData(
-        "point_data", p3d.GeomVertexFormat.getV3c4(), p3d.Geom.UHDynamic
-    )
+    vdata = p3d.GeomVertexData("point_data", p3d.GeomVertexFormat.getV3c4(), p3d.Geom.UHDynamic)
     numMaxPoints = svmBase.lidarRes * svmBase.lidarChs * svmBase.numLidars
     # 4 refers to the number of cameras
     vdata.setNumRows(numMaxPoints)
@@ -408,9 +333,7 @@ def UpdateResource(task):
     return task.cont
 
 
-def InitSVM(
-    base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, worldpointlist
-):
+def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, worldpointlist):
     if base.isInitializedUDP is True:
         return
 
@@ -483,69 +406,24 @@ def InitSVM(
 
     GeneratePointNode()
 
-    camera_fov = packetInit["Fov"]  # 150
-    verFoV = (
-        2
-        * math.atan(
-            math.tan(camera_fov * np.deg2rad(1) / 2) * (imageHeight / imageWidth)
-        )
-        * np.rad2deg(1)
-    )
+    camera_fov = packetInit["Fov"]
+    verFoV = 2 * math.atan(math.tan(camera_fov * np.deg2rad(1) / 2) * (imageHeight / imageWidth)) * np.rad2deg(1)
     projMat = createOglProjMatrix(verFoV, imageWidth / imageHeight, 10, 100000)
 
-    # LHS
-    center_z = -0
-
-    # sensor_pos_array = [
-    #     p3d.Vec3(340, 0, 236 - center_z),
-    #     p3d.Vec3(155, 140, 186 - center_z),
-    #     p3d.Vec3(-400, 0, 186 - center_z),
-    #     p3d.Vec3(155, -140, 146 - center_z),
-    # ]
     sensor_pos_array = [
-        p3d.Vec3(
-            packetInit["CameraF_location_x"],
-            packetInit["CameraF_location_y"],
-            packetInit["CameraF_location_z"],
-        ),
-        p3d.Vec3(
-            packetInit["CameraR_location_x"],
-            packetInit["CameraR_location_y"],
-            packetInit["CameraR_location_z"],
-        ),
-        p3d.Vec3(
-            packetInit["CameraB_location_x"],
-            packetInit["CameraB_location_y"],
-            packetInit["CameraB_location_z"],
-        ),
-        p3d.Vec3(
-            packetInit["CameraL_location_x"],
-            packetInit["CameraL_location_y"],
-            packetInit["CameraL_location_z"],
-        ),
+        p3d.Vec3(packetInit["CameraF_location_x"], packetInit["CameraF_location_y"], packetInit["CameraF_location_z"]),
+        p3d.Vec3(packetInit["CameraR_location_x"], packetInit["CameraR_location_y"], packetInit["CameraR_location_z"]),
+        p3d.Vec3(packetInit["CameraB_location_x"], packetInit["CameraB_location_y"], packetInit["CameraB_location_z"]),
+        p3d.Vec3(packetInit["CameraL_location_x"], packetInit["CameraL_location_y"], packetInit["CameraL_location_z"]),
     ]
 
-    sensor_rot_z_array = [0, 90, 180, -90]  # F R B L
-
-    # sensor_rot_z_array = [90, -90, 0, 180]
+    sensor_rot_z_array = [0, 90, 180, -90]
 
     cam_pos = p3d.Vec3(0, 0, 250)
 
-    # cam_rot_y_array = [-35, -43, -30, -43]
-    cam_rot_y_array = [
-        packetInit["CameraF_y"],
-        packetInit["CameraR_y"],
-        packetInit["CameraB_y"],
-        packetInit["CameraL_y"],
-    ]
+    cam_rot_y_array = [packetInit["CameraF_y"], packetInit["CameraR_y"], packetInit["CameraB_y"], packetInit["CameraL_y"]]
 
-    # LHS, RHS sameg
-    sensorMatLHS_array = [
-        p3d.LMatrix4f(),
-        p3d.LMatrix4f(),
-        p3d.LMatrix4f(),
-        p3d.LMatrix4f(),
-    ]
+    sensorMatLHS_array = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
     imgIdx = 0
 
     for sensorPos, camPos in zip(sensor_pos_array, base.camPositions):
@@ -553,18 +431,12 @@ def InitSVM(
 
     base.plane.setShaderInput("camPositions", base.camPositions)
 
-    matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
+    base.matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
     for deg, pos, rot_y in zip(sensor_rot_z_array, sensor_pos_array, cam_rot_y_array):
-        sensorMatRHS = p3d.LMatrix4f.rotateMat(
-            deg, p3d.Vec3(0, 0, -1)
-        ) * p3d.LMatrix4f.translateMat(pos.x, -pos.y, pos.z)
-        sensorMatLHS_array[imgIdx] = p3d.LMatrix4f.rotateMat(
-            deg, p3d.Vec3(0, 0, 1)
-        ) * p3d.LMatrix4f.translateMat(pos.x, pos.y, pos.z)
+        sensorMatRHS = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, -1)) * p3d.LMatrix4f.translateMat(pos.x, -pos.y, pos.z)
+        sensorMatLHS_array[imgIdx] = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, 1)) * p3d.LMatrix4f.translateMat(pos.x, pos.y, pos.z)
 
-        localCamMat = p3d.LMatrix4f.rotateMat(
-            rot_y, p3d.Vec3(0, -1, 0)
-        ) * p3d.LMatrix4f.translateMat(cam_pos)
+        localCamMat = p3d.LMatrix4f.rotateMat(rot_y, p3d.Vec3(0, -1, 0)) * p3d.LMatrix4f.translateMat(cam_pos)
         camMat = localCamMat * sensorMatRHS
         # camMat3 = camMat.getUpper3()  # or, use xformVec instead
 
@@ -579,7 +451,7 @@ def InitSVM(
         # viewProjMat = p3d.LMatrix4f()
         viewProjMat = viewMat * projMat
 
-        matViewProjs[imgIdx] = viewProjMat
+        base.matViewProjs[imgIdx] = viewProjMat
         if imgIdx == 1:
             print(("camPos1 {}").format(camMat.xformPoint(p3d.Vec3(0, 0, 0))))
             print(("camPos2 {}").format(pos))
@@ -591,19 +463,15 @@ def InitSVM(
         # print("plane.setShaderInput")
         base.quad.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
         # print("plane.setShaderInput")
-        base.sphere.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
+        # base.sphere.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
         # print("plane.setShaderInput")
         imgIdx += 1
 
-    base.planeTexArray.setup2dTextureArray(
-        imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
-    )
+    base.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
     base.plane.setShaderInput("cameraImgs", base.planeTexArray)
-    base.sphere.setShaderInput("cameraImgs", base.planeTexArray)
+    # base.sphere.setShaderInput("cameraImgs", base.planeTexArray)
 
-    base.semanticTexArray.setup2dTextureArray(
-        imageWidth, imageHeight, 4, p3d.Texture.T_int, p3d.Texture.F_r32i
-    )
+    base.semanticTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
     base.plane.setShaderInput("semanticImgs", base.semanticTexArray)
 
     base.sensorMatLHS_array = sensorMatLHS_array
@@ -617,17 +485,7 @@ def InitSVM(
     print("Texture Initialized!")
 
 
-def ProcSvmFromPackets(
-    base,
-    numLidars,
-    lidarRes,
-    lidarChs,
-    imageWidth,
-    imageHeight,
-    imgs,
-    segs,
-    worldpointlist,
-):
+def ProcSvmFromPackets(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, segs, worldpointlist):
     InitSVM(
         base,
         numLidars,
@@ -639,43 +497,114 @@ def ProcSvmFromPackets(
         worldpointlist,
     )
 
-    numMaxPoints = lidarRes * lidarChs * numLidars
+    def generate_depth_maps(shape=(512, 512), sparsity=0.05):
+        """
+        Generates a simulated depth map and its sparse version.
 
-    base.pointsVertex.setRow(0)
-    base.pointsColor.setRow(0)
+        Parameters:
+        - shape: Shape of the depth map to be generated.
+        - sparsity: Fraction of pixels to be retained in the sparse depth map.
 
-    # testpointcloud-------------------------------------------------------
-    # for i in worldpointlist:
-    #     posPoint = p3d.LPoint3f(i[0][0], i[0][1], i[0][2]) # 신기하게 이렇게 접근해야한다
-    #     posPointWS = base.sensorMatLHS_array[0].xformPoint(posPoint)
+        Returns:
+        - depth_map: Simulated depth map.
+        - sparse_depth: Generated sparse depth map.
+        """
+
+        # Coordinates creation
+        x = np.linspace(-np.pi, np.pi, shape[1])
+        y = np.linspace(-np.pi, np.pi, shape[0])
+        xx, yy = np.meshgrid(x, y)
+
+        # Depth map generation using sinusoidal functions and noise
+        depth_map = np.sin(xx) * np.cos(yy) + np.sin(3 * xx) * np.cos(2 * yy) + 0.5 * np.random.randn(*shape)
+        depth_map = 255 * (depth_map - np.min(depth_map)) / (np.max(depth_map) - np.min(depth_map))
+        depth_map = depth_map.astype(np.uint8)
+
+        # Sparse depth map creation
+        mask = np.random.choice([0, 1], size=depth_map.shape, p=[1 - sparsity, sparsity])
+        sparse_depth = np.where(mask, depth_map, 0)
+
+        return depth_map, sparse_depth
+
+    def poisson_interpolation(sparse_map, segmentation_map):
+        """
+        Interpolates a sparse depth map using the Poisson equation, but only for pixels where segmentation_map equals 1.
+
+        Parameters:
+        - sparse_map: Sparse depth map.
+        - segmentation_map: Map indicating where to interpolate. Pixels with value 1 will be interpolated.
+
+        Returns:
+        - interpolated_depth: Interpolated depth map.
+        """
+
+        # Define function to compute indices in a flattened array
+        def index(i, j, cols):
+            return i * cols + j
+
+        # Dimensions
+        rows, cols = sparse_map.shape
+
+        # Create a sparse matrix
+        A = lil_matrix((rows * cols, rows * cols))
+        b = np.zeros(rows * cols)
+
+        # Iterate through the depth map
+        for i in range(rows):
+            for j in range(cols):
+                idx = index(i, j, cols)
+                if segmentation_map[i, j] != 1:  # If pixel should not be interpolated
+                    A[idx, idx] = 1
+                    b[idx] = sparse_map[i, j]
+                else:
+                    if sparse_map[i, j] > 0:  # If pixel is known
+                        A[idx, idx] = 1
+                        b[idx] = sparse_map[i, j]
+                    else:  # If pixel is unknown
+                        A[idx, idx] = 4
+                        if i > 0:
+                            A[idx, index(i - 1, j, cols)] = -1
+                        if i < rows - 1:
+                            A[idx, index(i + 1, j, cols)] = -1
+                        if j > 0:
+                            A[idx, index(i, j - 1, cols)] = -1
+                        if j < cols - 1:
+                            A[idx, index(i, j + 1, cols)] = -1
+
+        # Solve the system
+        solution = spsolve(A.tocsr(), b)
+        return solution.reshape(rows, cols)
+
+    # base.pointsVertex.setRow(0)
+    # base.pointsColor.setRow(0)
+
+    # for worldpoint in worldpointlist:
+    #     posPointWS = p3d.LPoint3f(worldpoint[0], worldpoint[1], worldpoint[2])
     #     base.pointsVertex.setData3f(posPointWS)
-    #     base.pointsColor.setData4f( 1,0,0,1)
+    #     base.pointsColor.setData4f(1, 0, 0, 1)
 
-    for i in range(numMaxPoints):
-        x = random.randint(0, 1000)
-        y = random.randint(0, 1000)
-        z = random.randint(0, 1000)
-        base.pointsVertex.setData3f(x, y, z)
-        base.pointsColor.setData4f(0, 0, 0, 0)
+    depthmaps = []
 
-    # for i in range(numMaxPoints - numProcessPoints):
-    #     base.pointsVertex.setData3f(10000, 10000, 10000)
-    #     base.pointsColor.setData4f(0, 0, 0, 0)
-    # ------------------------------------------------------------------------------------------
-    # EH_img = [imgs[0], imgs[1],imgs[2], imgs[3]] FBLR FLBR
-    # EH_img = [imgs[0], imgs[2],imgs[1], imgs[3]]
+    for i in range(len(imgs)):
+        h, w, _ = imgs[i].shape
+        # depthmap = np.zeros((h, w))
+        # matViewProj = base.matViewProjs[i]
+        # for worldpoint in worldpointlist:
+        #     imagePos = matViewProj.xformPoint(p3d.LPoint3f(worldpoint[0], worldpoint[1], worldpoint[2]))
+        #     imagePos2D = p3d.LPoint2f((imagePos.x + 1.0) * 0.5 * w, (imagePos.y + 1.0) * 0.5 * h)
+        #     if 0 <= imagePos2D.x < w and 0 <= imagePos2D.y < h:
+        #         depthmap[imagePos.y * h][imagePos.x * w] = 255
+        depth_map, sparse_depth = generate_depth_maps((h, w), 0.05)
+        interpolated_depth = poisson_interpolation(sparse_depth, segs[i])
+        depthmaps.append(interpolated_depth)
 
-    # F R B L
-    EH_img = [imgs[0], imgs[1], imgs[2], imgs[3]]
-    SM_img = [segs[0], segs[1], segs[2], segs[3]]
+    imgnpArray = np.array(imgs).astype(np.uint8)
+    imgArray = imgnpArray.reshape((4, imageHeight, imageWidth, 4))
+    cameraArray = imgArray[:, :, :, :].copy()
+    semanticArray = np.array(segs).astype(np.uint32)
 
-    imgs_ = np.array(EH_img)
-    segs_ = np.array(SM_img).astype(np.uint32)
-    segs_ = segs_.reshape((4, imageHeight, imageWidth, 4))
-    # dst[:, :, 0] = src      # B-채널만 가져오기
-    segs_1 = segs_[:, :, :, 0].copy()
-    base.planeTexArray.setRamImage(imgs_)
-    base.semanticTexArray.setRamImage(segs_1)
+    base.planeTexArray.setRamImage(cameraArray)
+    base.semanticTexArray.setRamImage(semanticArray)
 
 
 def PacketProcessing(packetInit: dict, q: queue):
@@ -690,20 +619,13 @@ def PacketProcessing(packetInit: dict, q: queue):
     imageHeight = packetInit["imageHeight"]
 
     if q.empty():
-        # print("텅텅")
         time.sleep(0.02)
-        # continue
+
     frameData = q.get()
     worldpointList = frameData[0]
     imgs = frameData[1]
     segImg = frameData[2]
     segRaw = frameData[3]
-    # for img in imgs:
-    #     img = img[:, :, :3]
-    #     print(img.shape)
-    #     segImg.append(get_semantic_label(img))
-    #     time.sleep(1)
-    # F, R , B  L camera 순서로 들어온다
 
     cv.namedWindow("img 0", cv.WINDOW_GUI_NORMAL)
     cv.namedWindow("img 1", cv.WINDOW_GUI_NORMAL)
@@ -718,10 +640,10 @@ def PacketProcessing(packetInit: dict, q: queue):
     cv.moveWindow("img 1", 1165, 600)
     cv.moveWindow("img 2", 1370, 600)
     cv.moveWindow("img 3", 1575, 600)
-    cv.resizeWindow("img 0", 200, int(200 * 1280 / 1280.0))
-    cv.resizeWindow("img 1", 200, int(200 * 1280 / 1280.0))
-    cv.resizeWindow("img 2", 200, int(200 * 1280 / 1280.0))
-    cv.resizeWindow("img 3", 200, int(200 * 1280 / 1280.0))
+    cv.resizeWindow("img 0", 200, 200)
+    cv.resizeWindow("img 1", 200, 200)
+    cv.resizeWindow("img 2", 200, 200)
+    cv.resizeWindow("img 3", 200, 200)
 
     cv.namedWindow("s0", cv.WINDOW_GUI_NORMAL)
     cv.namedWindow("s1", cv.WINDOW_GUI_NORMAL)
@@ -736,24 +658,14 @@ def PacketProcessing(packetInit: dict, q: queue):
     cv.moveWindow("s1", 1165, 800)
     cv.moveWindow("s2", 1370, 800)
     cv.moveWindow("s3", 1575, 800)
-    cv.resizeWindow("s0", 200, int(200 * 1280 / 1280.0))
-    cv.resizeWindow("s1", 200, int(200 * 1280 / 1280.0))
-    cv.resizeWindow("s2", 200, int(200 * 1280 / 1280.0))
-    cv.resizeWindow("s3", 200, int(200 * 1280 / 1280.0))
+    cv.resizeWindow("s0", 200, 200)
+    cv.resizeWindow("s1", 200, 200)
+    cv.resizeWindow("s2", 200, 200)
+    cv.resizeWindow("s3", 200, 200)
 
     cv.waitKey(1)
 
-    ProcSvmFromPackets(
-        mySvm,
-        numLidars,
-        lidarRes,
-        lidarChs,
-        imageWidth,
-        imageHeight,
-        imgs,
-        segRaw,
-        worldpointList,
-    )
+    ProcSvmFromPackets(mySvm, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, segRaw, worldpointList)
 
 
 if __name__ == "__main__":
