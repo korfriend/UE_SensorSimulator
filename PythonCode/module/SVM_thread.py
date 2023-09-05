@@ -270,12 +270,18 @@ class SurroundView(ShowBase):
         return task.cont
 
     def shaderRecompile(self):
-        self.planeShader = p3d.Shader.load(p3d.Shader.SL_GLSL, vertex="./shaders/svm_vs.glsl", fragment="./shaders/svm_ps_plane.glsl")
+        self.planeShader = p3d.Shader.load(
+            p3d.Shader.SL_GLSL, vertex="./shaders/svm_vs.glsl", fragment="./shaders/svm_ps_plane.glsl"
+        )
         self.plane.setShader(mySvm.planeShader)
         # self.sphereShader = p3d.Shader.load(p3d.Shader.SL_GLSL, vertex="./shaders/sphere_vs.glsl", fragment="./shaders/sphere_ps.glsl")
         # self.sphere.setShader(self.sphereShader)
 
-        self.quad.setShader(p3d.Shader.load(p3d.Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post1_ps.glsl"))
+        self.quad.setShader(
+            p3d.Shader.load(
+                p3d.Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post1_ps.glsl"
+            )
+        )
 
 
 def GeneratePointNode():
@@ -421,7 +427,12 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
 
     cam_pos = p3d.Vec3(0, 0, 250)
 
-    cam_rot_y_array = [packetInit["CameraF_y"], packetInit["CameraR_y"], packetInit["CameraB_y"], packetInit["CameraL_y"]]
+    cam_rot_y_array = [
+        packetInit["CameraF_y"],
+        packetInit["CameraR_y"],
+        packetInit["CameraB_y"],
+        packetInit["CameraL_y"],
+    ]
 
     sensorMatLHS_array = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
     imgIdx = 0
@@ -433,8 +444,12 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
 
     base.matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
     for deg, pos, rot_y in zip(sensor_rot_z_array, sensor_pos_array, cam_rot_y_array):
-        sensorMatRHS = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, -1)) * p3d.LMatrix4f.translateMat(pos.x, -pos.y, pos.z)
-        sensorMatLHS_array[imgIdx] = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, 1)) * p3d.LMatrix4f.translateMat(pos.x, pos.y, pos.z)
+        sensorMatRHS = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, -1)) * p3d.LMatrix4f.translateMat(
+            pos.x, -pos.y, pos.z
+        )
+        sensorMatLHS_array[imgIdx] = p3d.LMatrix4f.rotateMat(deg, p3d.Vec3(0, 0, 1)) * p3d.LMatrix4f.translateMat(
+            pos.x, pos.y, pos.z
+        )
 
         localCamMat = p3d.LMatrix4f.rotateMat(rot_y, p3d.Vec3(0, -1, 0)) * p3d.LMatrix4f.translateMat(cam_pos)
         camMat = localCamMat * sensorMatRHS
@@ -538,10 +553,6 @@ def ProcSvmFromPackets(base, numLidars, lidarRes, lidarChs, imageWidth, imageHei
         - interpolated_depth: Interpolated depth map.
         """
 
-        # Define function to compute indices in a flattened array
-        def index(i, j, cols):
-            return i * cols + j
-
         # Dimensions
         rows, cols = sparse_map.shape
 
@@ -549,27 +560,40 @@ def ProcSvmFromPackets(base, numLidars, lidarRes, lidarChs, imageWidth, imageHei
         A = lil_matrix((rows * cols, rows * cols))
         b = np.zeros(rows * cols)
 
-        # Iterate through the depth map
-        for i in range(rows):
-            for j in range(cols):
-                idx = index(i, j, cols)
-                if segmentation_map[i, j] != 1:  # If pixel should not be interpolated
-                    A[idx, idx] = 1
-                    b[idx] = sparse_map[i, j]
-                else:
-                    if sparse_map[i, j] > 0:  # If pixel is known
-                        A[idx, idx] = 1
-                        b[idx] = sparse_map[i, j]
-                    else:  # If pixel is unknown
-                        A[idx, idx] = 4
-                        if i > 0:
-                            A[idx, index(i - 1, j, cols)] = -1
-                        if i < rows - 1:
-                            A[idx, index(i + 1, j, cols)] = -1
-                        if j > 0:
-                            A[idx, index(i, j - 1, cols)] = -1
-                        if j < cols - 1:
-                            A[idx, index(i, j + 1, cols)] = -1
+        # Using numpy operations for iteration
+        idx_matrix = np.arange(rows * cols).reshape(rows, cols)
+        mask_non_interpolate = segmentation_map != 1
+        mask_known = sparse_map > 0
+
+        # For non-interpolated pixels
+        A[idx_matrix[mask_non_interpolate].ravel(), idx_matrix[mask_non_interpolate].ravel()] = 1
+        b[idx_matrix[mask_non_interpolate].ravel()] = sparse_map[mask_non_interpolate]
+
+        # For known pixels
+        A[idx_matrix[mask_known].ravel(), idx_matrix[mask_known].ravel()] = 1
+        b[idx_matrix[mask_known].ravel()] = sparse_map[mask_known]
+
+        # For unknown pixels
+        mask_unknown = ~mask_non_interpolate & ~mask_known
+
+        # Current pixel
+        A[idx_matrix[mask_unknown].ravel(), idx_matrix[mask_unknown].ravel()] = 4
+
+        # Upper pixel
+        upper_indices = np.roll(idx_matrix, shift=1, axis=0)
+        A[idx_matrix[1:, :][mask_unknown[1:, :]].ravel(), upper_indices[1:, :][mask_unknown[1:, :]].ravel()] = -1
+
+        # Lower pixel
+        lower_indices = np.roll(idx_matrix, shift=-1, axis=0)
+        A[idx_matrix[:-1, :][mask_unknown[:-1, :]].ravel(), lower_indices[:-1, :][mask_unknown[:-1, :]].ravel()] = -1
+
+        # Left pixel
+        left_indices = np.roll(idx_matrix, shift=1, axis=1)
+        A[idx_matrix[:, 1:][mask_unknown[:, 1:]].ravel(), left_indices[:, 1:][mask_unknown[:, 1:]].ravel()] = -1
+
+        # Right pixel
+        right_indices = np.roll(idx_matrix, shift=-1, axis=1)
+        A[idx_matrix[:, :-1][mask_unknown[:, :-1]].ravel(), right_indices[:, :-1][mask_unknown[:, :-1]].ravel()] = -1
 
         # Solve the system
         solution = spsolve(A.tocsr(), b)
