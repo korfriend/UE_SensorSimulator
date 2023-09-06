@@ -183,11 +183,12 @@ void main()
     
     // height correction
     switch (semantic) {
-        case 2: pos.z = 25.0; break;
-        case 3: pos.z = 100; break;
-        case 4: pos.z = 100.1; break;
+        case 1: pos.z = -150; break;
+        // case 2: pos.z = 25.0; break;
+        // case 3: pos.z = 100; break;
+        // case 4: pos.z = 100.1; break;
     }
-    pos.z = 0;
+    // pos.z = 0;
 
     int overlapIndex[4] = {int(camId0), int(camId1), 0, 0};
     const int debugMode = 0;
@@ -240,6 +241,22 @@ void main()
                     break;
                 }
             }
+            break;
+        }
+        case 3: {
+            int idx0 = overlapIndex[0];
+            int idx1 = overlapIndex[1];
+            int camId = 0;
+            if (idx0 == 0 || idx0 == 2)
+                camId = idx0;
+            else if (idx1 == 0 || idx1 == 2)
+                camId = idx1;
+            vec4 imagePos = viewProjs[camId] * vec4(pos, 1.0);
+            if (imagePos.w <= 0.001) imagePos.w = 0.001;
+            vec2 imagePos2D = imagePos.xy / imagePos.w;
+            vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+            texPos0 = distortPoint(texPos0);
+            colorOut = texture(cameraImgs, vec3(texPos0.x, (1 - texPos0.y), camId));
             break;
         }
     }
