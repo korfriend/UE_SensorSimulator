@@ -1,0 +1,269 @@
+{
+    "backup_file": "string",
+    "boat_type": {
+        "custom_breadth": 3.0,
+        "custom_length": 9.32
+    },
+    "individual_view_parameter": {
+        "cameras": [
+            {
+                "camera_position": "1",
+                "rotation": {
+                    "pitch": 45.0,
+                    "roll": 0.0,
+                    "yaw": 0.0
+                },
+                "fov": 100
+            },
+            {
+                "camera_position": "2",
+                "rotation": {
+                    "pitch": 0.0,
+                    "roll": 0.0,
+                    "yaw": 90.0
+                },
+                "fov": 100
+            },
+            {
+                "camera_position": "3",
+                "rotation": {
+                    "pitch": 0.0,
+                    "roll": 0.0,
+                    "yaw": -90.0
+                },
+                "fov": 100
+            },
+            {
+                "camera_position": "4",
+                "rotation": {
+                    "pitch": 45.0,
+                    "roll": 0.0,
+                    "yaw": 90.0
+                },
+                "fov": 100
+            },
+            {
+                "camera_position": "5",
+                "rotation": {
+                    "pitch": 45.0,
+                    "roll": 0.0,
+                    "yaw": -90.0
+                },
+                "fov": 100
+            },
+            {
+                "camera_position": "6",
+                "rotation": {
+                    "pitch": 45.0,
+                    "roll": 0.0,
+                    "yaw": 180.0
+                },
+                "fov": 100
+            }
+        ]
+    },
+    "distance_guide": {
+        "show_distance_guide": [
+            false,
+            false,
+            false,
+            false
+        ],
+        "distance_guide_thickness": 0.1,
+        "distance_guide_step_size": 1.0
+    },
+    "light_type": [
+        {
+            "light_type": "Day Light",
+            "ambient_light": {
+                "ambient_light_color": "0xffffff",
+                "ambient_light_intensity": 0.5
+            },
+            "directional_light1": {
+                "directional_light_color": "0xffffff",
+                "directional_light_intensity": 1.0,
+                "directional_light_position": [
+                    4,
+                    15,
+                    -10
+                ]
+            },
+            "directional_light2": {
+                "directional_light_color": "0xffffff",
+                "directional_light_intensity": 1.0,
+                "directional_light_position": [
+                    -9,
+                    -13,
+                    -7
+                ]
+            },
+            "directional_light3": {
+                "directional_light_color": "0xffffff",
+                "directional_light_intensity": 1.0,
+                "directional_light_position": [
+                    -1,
+                    -1,
+                    1
+                ]
+            },
+            "duration_time": {
+                "duration_time": [
+                    9,
+                    18
+                ]
+            }
+        },
+        {
+            "light_type": "Dawn Light",
+            "ambient_light": {
+                "ambient_light_color": "0xffffff",
+                "ambient_light_intensity": 0.6
+            },
+            "directional_light1": {
+                "directional_light_color": "0xffffff",
+                "directional_light_intensity": 1.0,
+                "directional_light_position": [
+                    4,
+                    15,
+                    -10
+                ]
+            },
+            "directional_light2": {
+                "directional_light_color": "0xffffff",
+                "directional_light_intensity": 1.0,
+                "directional_light_position": [
+                    -9,
+                    -13,
+                    -7
+                ]
+            },
+            "directional_light3": {
+                "directional_light_color": "0xffffff",
+                "directional_light_intensity": 1.0,
+                "directional_light_position": [
+                    -1,
+                    -1,
+                    1
+                ]
+            },
+            "duration_time": {
+                "duration_time": [
+                    3,
+                    5
+                ]
+            }
+        }
+    ],
+    "extrinsic_parameter": {
+        "cameras": [
+            {
+                "camera_position": "1",
+                "location": {
+                    "translation_x": 4.54,
+                    "translation_y": -0.55,
+                    "translation_z": -1.3
+                },
+                "rotation": {
+                    "pitch": 50.2,
+                    "roll": 0.2,
+                    "yaw": -2.9
+                }
+            },
+            {
+                "camera_position": "2",
+                "location": {
+                    "translation_x": 3.6,
+                    "translation_y": 1.2,
+                    "translation_z": -1.0
+                },
+                "rotation": {
+                    "pitch": 23.5,
+                    "roll": 0.7,
+                    "yaw": -13.3
+                }
+            },
+            {
+                "camera_position": "3",
+                "location": {
+                    "translation_x": 3.6,
+                    "translation_y": -1.2,
+                    "translation_z": -1.0
+                },
+                "rotation": {
+                    "pitch": 19.8,
+                    "roll": -2.2,
+                    "yaw": 13.9
+                }
+            },
+            {
+                "camera_position": "4",
+                "location": {
+                    "translation_x": 0.22,
+                    "translation_y": 1.18,
+                    "translation_z": -2.36
+                },
+                "rotation": {
+                    "pitch": 36.9,
+                    "roll": 2.2,
+                    "yaw": 0
+                }
+            },
+            {
+                "camera_position": "5",
+                "location": {
+                    "translation_x": 0.22,
+                    "translation_y": -1.18,
+                    "translation_z": -2.36
+                },
+                "rotation": {
+                    "pitch": 39.6,
+                    "roll": 1.7,
+                    "yaw": 0
+                }
+            },
+            {
+                "camera_position": "6",
+                "location": {
+                    "translation_x": -1.57,
+                    "translation_y": 0,
+                    "translation_z": -2.55
+                },
+                "rotation": {
+                    "pitch": 42.4,
+                    "roll": -3.2,
+                    "yaw": -1.2
+                }
+            }
+        ],
+        "camera_z_pose_offset": 0.0
+    },
+    "stitching_configuration": {
+        "stitching_line_direction": {
+            "bow_stbd_sector": 45,
+            "bow_port_sector": 45,
+            "stern_stbd_sector": 45,
+            "stern_port_sector": 45
+        }
+    },
+    "virtual_camera_configuration": {
+        "camera_mode": "test",
+        "view_point_location_xyz": [
+            1,
+            1,
+            1
+        ]
+    },
+    "engineer_configuration": {
+        "floor_plane_ratio": 0.5,
+        "segment_phi": 200,
+        "segment_theta": 200,
+        "range_phi": 90,
+        "range_theta": 180,
+        "plane_to_sky_fov": 40,
+        "segment_radius": 20,
+        "segment_circumference": 100,
+        "blind_patch_location_y": 0,
+        "bowl_stitch_thickness": 2,
+        "inner_stitch_thickness": 0.5
+    }
+}

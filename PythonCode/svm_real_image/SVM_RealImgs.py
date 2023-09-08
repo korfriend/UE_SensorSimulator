@@ -9,14 +9,14 @@ from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Shader
 
-with open("./data/source_video/Calibration_Simul.json") as f:
+with open("./Calibration_Simul.json") as f:
     calibration = json.load(f)
 
 boat_breadth = calibration["boat_type"]["custom_breadth"] * 100
 boat_length = calibration["boat_type"]["custom_length"] * 100
 
 extrinsic_parameter = calibration["extrinsic_parameter"]["cameras"]
-del extrinsic_parameter[3:5]
+del extrinsic_parameter[1:3]
 extrinsic_parameter[2], extrinsic_parameter[3] = extrinsic_parameter[3], extrinsic_parameter[2]
 for extrinsic in extrinsic_parameter:
     extrinsic["location"]["translation_x"] *= 100
@@ -51,7 +51,15 @@ class SurroundView(ShowBase):
 
         self.render.setAntialias(p3d.AntialiasAttrib.MAuto)
         self.cam.setPos(0, 0, -4000)
-        self.cam.lookAt(p3d.LPoint3f(0, 0, 0), p3d.LVector3f(0, -1, 0))
+        self.cam.lookAt(p3d.LPoint3f(0, 0, 0), p3d.LVector3f(1, 0, 0))
+
+        mat = p3d.Mat4(self.cam.getMat())
+        mat.invertInPlace()
+        self.mouseInterfaceNode.setMat(mat)
+        self.enableMouse()
+
+        self.cam.setPos(0, 0, 0)
+        self.cam.setHpr(0, 0, 0)
 
         self.renderObj = p3d.NodePath("fgRender")
         self.renderSVM = p3d.NodePath("bgRender")
@@ -89,7 +97,9 @@ class SurroundView(ShowBase):
         tex2.setClearColor(p3d.Vec4(0, 0, 0, 0))
         tex1.clear()
         tex2.clear()
-        self.buffer1.addRenderTexture(tex1, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color)
+        self.buffer1.addRenderTexture(
+            tex1, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color
+        )
         # I dont know why the RTP_aux_rgba_x with RTM_copy_ram (F_rgba32i?!) affects incorrect render-to-texture result.
         # so, tricky.. the tex2 only contains pos info (no need to readback to RAM)
         self.buffer1.addRenderTexture(
@@ -132,10 +142,10 @@ class SurroundView(ShowBase):
         self.cam2.reparentTo(self.cam)
 
         self.boat = self.loader.loadModel("avikus_boat.glb")
-        self.boat.setHpr(0, -90, 180)
+        self.boat.setHpr(90, -90, 180)
 
         bbox = self.boat.getTightBounds()
-        scale = boat_length / (bbox[1].y - bbox[0].y)
+        scale = boat_length / (bbox[1].x - bbox[0].x)
         self.boat.setScale(scale)
 
         # bbox = self.boat.getTightBounds()
@@ -144,8 +154,9 @@ class SurroundView(ShowBase):
         self.boat.reparentTo(self.renderObj)
 
         self.axis = self.loader.loadModel("zup-axis")
-        # self.axis.setPos(0, 0, 0)
+        self.axis.setPos(0, 0, 0)
         # self.axis.setHpr(180, 0, 0)
+        self.axis.setScale(100)
         self.axis.reparentTo(self.renderObj)
 
         manager = FilterManager(self.win, self.cam)
@@ -201,7 +212,9 @@ class SurroundView(ShowBase):
                 svmBase.quad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
 
             svmBase.planeTexArray = p3d.Texture()
-            svmBase.planeTexArray.setup2dTextureArray(img_width, img_height, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
+            svmBase.planeTexArray.setup2dTextureArray(
+                img_width, img_height, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
+            )
             svmBase.plane.setShaderInput("cameraImgs", svmBase.planeTexArray)
             svmBase.quad.setShaderInput("cameraImgs", svmBase.planeTexArray)
 
@@ -211,7 +224,9 @@ class SurroundView(ShowBase):
             # initial setting like the above code! (for resource optimization)
             # svmBase.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
             svmBase.semanticTexArray = p3d.Texture()
-            svmBase.semanticTexArray.setup2dTextureArray(img_width, img_height, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
+            svmBase.semanticTexArray.setup2dTextureArray(
+                img_width, img_height, 4, p3d.Texture.T_int, p3d.Texture.F_r32i
+            )
             print(img_width, img_height)
             svmBase.plane.setShaderInput("semanticImgs", svmBase.semanticTexArray)
             svmBase.quad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
@@ -264,19 +279,33 @@ def make_extrinsic_matrix(extrinsic):
     defaultYaw = 0
     camera_position = int(extrinsic["camera_position"])
     if camera_position == 1:
-        print("position is 1")
+        print("position is front")
         defaultYaw = 0
-    elif camera_position == 3 or camera_position == 5:
-        print("position is 3 or 5")
-        defaultYaw = -90
-    elif camera_position == 2 or camera_position == 4:
-        print("position is 2 or 4")
+    elif camera_position == 2:
+        print("position is blind right")
         defaultYaw = 90
+    elif camera_position == 3:
+        print("position is blind left")
+        defaultYaw = -90
+    elif camera_position == 4:
+        print("position is right")
+        defaultYaw = 90
+    elif camera_position == 5:
+        print("position is left")
+        defaultYaw = -90
     elif camera_position == 6:
-        print("position is 6")
+        print("position is rear")
         defaultYaw = 180
-    rotation = [-extrinsic["rotation"]["pitch"], extrinsic["rotation"]["roll"], -extrinsic["rotation"]["yaw"] - defaultYaw]
-    translation = [extrinsic["location"]["translation_x"], extrinsic["location"]["translation_y"], extrinsic["location"]["translation_z"]]
+    rotation = [
+        -extrinsic["rotation"]["pitch"],
+        extrinsic["rotation"]["roll"],
+        -extrinsic["rotation"]["yaw"] - defaultYaw,
+    ]
+    translation = [
+        extrinsic["location"]["translation_x"],
+        extrinsic["location"]["translation_y"],
+        extrinsic["location"]["translation_z"],
+    ]
     rotation_matrix0 = euler_to_matrix(rotation)
     rotation_matrix1 = euler_to_matrix([0, 0, -90])
     rotation_matrix = rotation_matrix1 @ rotation_matrix0
@@ -318,18 +347,63 @@ def euler_to_matrix(euler_angle):
     return R_z @ R_y @ R_x
 
 
+def computeLookAt(camera_pos, camera_target, camera_up):
+    forward = camera_pos - camera_target
+    forward.normalize()
+    right = forward.cross(camera_up)
+    right.normalize()
+    up = right.cross(forward)
+    # print(("right {}").format(right))
+    # print(("up {}").format(up))
+    # print(("forward  {}").format(forward))
+    # row major in pand3d core but memory convention is based on the conventional column major
+    matLookAt = p3d.LMatrix4f(
+        right[0],
+        up[0],
+        forward[0],
+        0.0,
+        right[1],
+        up[1],
+        forward[1],
+        0.0,
+        right[2],
+        up[2],
+        forward[2],
+        0.0,
+        -p3d.LVector3f.dot(right, camera_pos),
+        -p3d.LVector3f.dot(up, camera_pos),
+        -p3d.LVector3f.dot(forward, camera_pos),
+        1.0,
+    )
+    return matLookAt
+
+
 def make_view_matrix(translation, rotation_matrix):
-    # Create a 4x4 identity matrix
-    extrinsic_matrix = np.eye(4)
+    T = p3d.LMatrix4f().translateMat(translation[0], translation[1], translation[2])
 
-    # Insert rotation_matrix into the extrinsic_matrix
-    extrinsic_matrix[:3, :3] = rotation_matrix
+    R = p3d.LMatrix4f()
+    R[0][0] = rotation_matrix[0][0]
+    R[0][1] = rotation_matrix[0][1]
+    R[0][2] = rotation_matrix[0][2]
+    R[1][0] = rotation_matrix[1][0]
+    R[1][1] = rotation_matrix[1][1]
+    R[1][2] = rotation_matrix[1][2]
+    R[2][0] = rotation_matrix[2][0]
+    R[2][1] = rotation_matrix[2][1]
+    R[2][2] = rotation_matrix[2][2]
 
-    # Insert translation into the last row of the extrinsic_matrix
-    extrinsic_matrix[3, :3] = translation
+    R.transposeInPlace()
+    view2world = R * T
 
-    # Return the inverse of the extrinsic_matrix to get the view matrix
-    return np.linalg.inv(extrinsic_matrix)
+    camPos = view2world.xformPoint(p3d.Vec3(0, 0, 0))
+    camView = view2world.xformVec(p3d.Vec3(0, 0, 1)).normalized()
+    camUp = view2world.xformVec(p3d.Vec3(0, -1, 0)).normalized()
+
+    print(("camPos {}").format(camPos))
+    print(("camView {}").format(camView))
+    print(("camUp  {}").format(camUp))
+
+    return computeLookAt(camPos, camPos + camView, camUp)
 
 
 def make_projection_matrix(fx, fy, skew_c, cx, cy, img_width, img_height, near_p, far_p):
@@ -337,7 +411,7 @@ def make_projection_matrix(fx, fy, skew_c, cx, cy, img_width, img_height, near_p
     qn = far_p * near_p / (near_p - far_p)
 
     projection_matrix = p3d.LMatrix4f()
-    projection_matrix[0][0] = 2.0 * fx / img_width
+    projection_matrix[0][0] = -2.0 * fx / img_width
     projection_matrix[1][0] = -2.0 * skew_c / img_width
     projection_matrix[2][0] = (img_width + 2.0 * 0 - 2.0 * cx) / img_width
     projection_matrix[3][0] = 0
@@ -362,95 +436,11 @@ def InitSVM(base, imageWidth, imageHeight):
     matProj = make_projection_matrix(fx, fy, skew_c, cx, cy, imageWidth, imageHeight, 10, 10000)
     # projMat.transposeInPlace()
 
-    matViews = []
-
-    matViewFront = p3d.LMatrix4f(
-        0.9992660293819391,
-        0.03830607856152497,
-        0.00021649132087547457,
-        0,
-        0.019186887951899295,
-        -0.5053915229159182,
-        0.8626768061652347,
-        0,
-        0.03315517838852627,
-        -0.8620394729419105,
-        -0.5057555548247171,
-        0,
-        19.805833783411012,
-        -519.1335350240013,
-        437.3066450005394,
-        1,
-    )
-    matViews.append(matViewFront)
-
-    matViewRight = p3d.LMatrix4f(
-        -0.05054856147246779,
-        0.7059372391096549,
-        -0.706468298914609,
-        0,
-        0.9978433106243765,
-        0.06535797412724426,
-        -0.006087910985401715,
-        0,
-        0.04187565372919936,
-        -0.7052524013828096,
-        -0.7077185033390969,
-        0,
-        116.8902552996818,
-        -251.0251450146386,
-        38.053183655967726,
-        1,
-    )
-    matViews.append(matViewRight)
-
-    matViewRear = p3d.LMatrix4f(
-        -0.9992873520600425,
-        -0.008568458995732121,
-        0.036760978268622464,
-        0,
-        -0.03140387017959493,
-        0.7290592323411924,
-        -0.6837297950768376,
-        0,
-        -0.020942419883356943,
-        -0.6843969734361116,
-        -0.7288087525550985,
-        0,
-        13.334953660706106,
-        -529.6492087936449,
-        239.03534181190214,
-        1,
-    )
-    matViews.append(matViewRear)
-
-    matViewLeft = p3d.LMatrix4f(
-        0.006980197018203659,
-        -0.7020491889150968,
-        0.7120942446005599,
-        0,
-        -0.9998233295733476,
-        -0.017328178353838954,
-        -0.00728312266837638,
-        0,
-        0.0174524064372837,
-        -0.7119176009754166,
-        -0.7020461116842365,
-        0,
-        -95.89513094995147,
-        -251.08578539176265,
-        31.449200853016557,
-        1.0000000000000002,
-    )
-    matViews.append(matViewLeft)
-
     matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
     for i, extrinsic in enumerate(extrinsic_parameter):
-        # translation, rotation_matrix = make_extrinsic_matrix(extrinsic)
-        # matView = make_view_matrix(translation, rotation_matrix)
-        # matView = p3d.LMatrix4f(*matView.flatten())
-        # matViewProj = matView * matProj
-        matViewProj = matViews[i] * matProj
+        translation, rotation_matrix = make_extrinsic_matrix(extrinsic)
+        matView = make_view_matrix(translation, rotation_matrix)
+        matViewProj = matView * matProj
         matViewProjs[i] = matViewProj
 
         base.plane.setShaderInput("matViewProj" + str(i), matViewProj)
@@ -465,10 +455,14 @@ def InitSVM(base, imageWidth, imageHeight):
     print("Texture Initialized!")
 
 
-base_path = "./data/ws_segmenet"
+base_path = "./data"
 camera_positions = ["front", "right", "rear", "left"]
-image_paths = {position: sorted(os.listdir(os.path.join(base_path, position, "images"))) for position in camera_positions}
-semantic_paths = {position: sorted(os.listdir(os.path.join(base_path, position, "pseudo_color_prediction"))) for position in camera_positions}
+image_paths = {
+    position: sorted(os.listdir(os.path.join(base_path, position, "images"))) for position in camera_positions
+}
+semantic_paths = {
+    position: sorted(os.listdir(os.path.join(base_path, position, "labels"))) for position in camera_positions
+}
 num_images = len(image_paths["front"])
 
 current_idx = 0
@@ -488,7 +482,7 @@ def loadNextImage(task):
         imgs.append(img)
 
         # Load semantic image
-        semantic = cv.imread(os.path.join(base_path, position, "pseudo_color_prediction", semantic_paths[position][current_idx]))
+        semantic = cv.imread(os.path.join(base_path, position, "labels", semantic_paths[position][current_idx]))
         semantic = cv.resize(semantic, (img_width, img_height))
         semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
         semantics.append(semantic)
