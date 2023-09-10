@@ -72,7 +72,6 @@ vec2 distortPoint(vec2 Array_uv)
 void main() {
     vec3 pos = worldcoord;
     mat4 viewProjs[4] = {matViewProj0, matViewProj1, matViewProj2, matViewProj3};
-    pos.z = 0;
     int count = 0;
     int mapProp = 0;    // 0 : undef, 1 : ground, 2 : target geometry
     int overlapIndex[4] = {-1, -1, -1, -1};
