@@ -9,7 +9,11 @@ from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Shader
 
-with open("./Calibration_Simul.json") as f:
+debug_mode = True  # Set this variable to True or False to enable or disable debug mode
+
+calibration_filepath = "./Calibration_Simul_Debug.json" if debug_mode else "./Calibration_Simul.json"
+
+with open(calibration_filepath) as f:
     calibration = json.load(f)
 
 boat_breadth = calibration["boat_type"]["custom_breadth"] * 100
@@ -347,62 +351,48 @@ def euler_to_matrix(euler_angle):
     return R_z @ R_y @ R_x
 
 
-def computeLookAt(camera_pos, camera_target, camera_up):
-    forward = camera_pos - camera_target
-    forward.normalize()
-    right = forward.cross(camera_up)
-    right.normalize()
-    up = right.cross(forward)
-    # print(("right {}").format(right))
-    # print(("up {}").format(up))
-    # print(("forward  {}").format(forward))
+def computeLookAt(eye, center, up):
+    z = eye - center
+    z.normalize()
+    x = up.cross(z)
+    x.normalize()
+    y = z.cross(x)
+    # print(("x {}").format(x))
+    # print(("y {}").format(y))
+    # print(("z {}").format(z))
     # row major in pand3d core but memory convention is based on the conventional column major
     matLookAt = p3d.LMatrix4f(
-        right[0],
-        up[0],
-        forward[0],
+        x[0],
+        y[0],
+        z[0],
         0.0,
-        right[1],
-        up[1],
-        forward[1],
+        x[1],
+        y[1],
+        z[1],
         0.0,
-        right[2],
-        up[2],
-        forward[2],
+        x[2],
+        y[2],
+        z[2],
         0.0,
-        -p3d.LVector3f.dot(right, camera_pos),
-        -p3d.LVector3f.dot(up, camera_pos),
-        -p3d.LVector3f.dot(forward, camera_pos),
+        -p3d.LVector3f.dot(x, eye),
+        -p3d.LVector3f.dot(y, eye),
+        -p3d.LVector3f.dot(z, eye),
         1.0,
     )
     return matLookAt
 
 
 def make_view_matrix(translation, rotation_matrix):
-    T = p3d.LMatrix4f().translateMat(translation[0], translation[1], translation[2])
-
-    R = p3d.LMatrix4f()
-    R[0][0] = rotation_matrix[0][0]
-    R[0][1] = rotation_matrix[0][1]
-    R[0][2] = rotation_matrix[0][2]
-    R[1][0] = rotation_matrix[1][0]
-    R[1][1] = rotation_matrix[1][1]
-    R[1][2] = rotation_matrix[1][2]
-    R[2][0] = rotation_matrix[2][0]
-    R[2][1] = rotation_matrix[2][1]
-    R[2][2] = rotation_matrix[2][2]
-
+    T = p3d.LMatrix4f().translateMat(*translation)
+    R = p3d.LMatrix4f(p3d.LMatrix3f(*rotation_matrix.flatten()))
     R.transposeInPlace()
     view2world = R * T
-
     camPos = view2world.xformPoint(p3d.Vec3(0, 0, 0))
     camView = view2world.xformVec(p3d.Vec3(0, 0, 1)).normalized()
     camUp = view2world.xformVec(p3d.Vec3(0, -1, 0)).normalized()
-
-    print(("camPos {}").format(camPos))
-    print(("camView {}").format(camView))
-    print(("camUp  {}").format(camUp))
-
+    # print(("camPos {}").format(camPos))
+    # print(("camView {}").format(camView))
+    # print(("camUp  {}").format(camUp))
     return computeLookAt(camPos, camPos + camView, camUp)
 
 
@@ -525,8 +515,6 @@ def loadDebugImages():
 
 if __name__ == "__main__":
     mySvm = SurroundView()
-
-    debug_mode = False  # Set this variable to True or False to enable or disable debug mode
 
     if not debug_mode:
         image_paths = {
