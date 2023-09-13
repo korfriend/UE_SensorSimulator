@@ -174,7 +174,7 @@ void main()
     int camId1 = geoInfo0.z;
 
     vec4 colorOut = vec4(0, 0, 0, 1);
-//#define MYDEBUG__
+// #define MYDEBUG__
 #ifdef MYDEBUG__ 
     
     if (count > 0) {
@@ -280,13 +280,22 @@ void main()
                 camId = idx0;
             else if (idx1 == 0 || idx1 == 2)
                 camId = idx1;
-            vec4 imagePos = viewProjs[camId] * vec4(pos, 1.0);
-            if (imagePos.w <= 0.001) imagePos.w = 0.001;
-            vec2 imagePos2D = imagePos.xy / imagePos.w;
-            vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
-            texPos0 = distortPoint(texPos0);
-            colorOut = texture(cameraImgs, vec3(texPos0.x, (1 - texPos0.y), camId));
-            break;
+            if(debugMode == 1) {
+                switch(camId) {
+                    case 0: colorOut = vec4(1, 0, 0, 1); break;
+                    case 1: colorOut = vec4(0, 1, 0, 1); break;
+                    case 2: colorOut = vec4(0, 0, 1, 1); break;
+                    case 3: colorOut = vec4(1, 1, 1, 1); break;
+                }
+            } else {
+                vec4 imagePos = viewProjs[camId] * vec4(pos, 1.0);
+                if (imagePos.w <= 0.001) imagePos.w = 0.001;
+                vec2 imagePos2D = imagePos.xy / imagePos.w;
+                vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+                texPos0 = distortPoint(texPos0);
+                colorOut = texture(cameraImgs, vec3(texPos0.x, (1 - texPos0.y), camId));
+                break;
+            }
         }
     }
 #endif
