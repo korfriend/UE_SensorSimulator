@@ -149,12 +149,13 @@ class SurroundView(ShowBase):
         self.boat.setHpr(90, -90, 180)
 
         bbox = self.boat.getTightBounds()
-        scale = boat_length / (bbox[1].x - bbox[0].x)
-        self.boat.setScale(scale)
+        scale_x = boat_length / (bbox[1].x - bbox[0].x)
+        scale_y = boat_breadth / (bbox[1].y - bbox[0].y)
+        self.boat.setScale(scale_y, scale_y, scale_x)  # (breath, height, length)
 
-        # bbox = self.boat.getTightBounds()
-        # print(bbox)
-        # self.boat.setPos(-bbox[0].z)
+        bbox = self.boat.getTightBounds()
+        origin = (bbox[0] + bbox[1]) / 2
+        self.boat.setPos(-origin.x, -origin.y, 0)
         self.boat.reparentTo(self.renderObj)
 
         self.axis = self.loader.loadModel("zup-axis")

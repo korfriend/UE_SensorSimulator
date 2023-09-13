@@ -299,8 +299,8 @@ void main()
         }
     }
 #endif
-    //if (sceneColor.r + sceneColor.g + sceneColor.b > 0)
-    //    colorOut = sceneColor;
+    if (sceneColor.r + sceneColor.g + sceneColor.b > 0)
+       colorOut = sceneColor;
 
     p3d_FragColor = colorOut;
 }
