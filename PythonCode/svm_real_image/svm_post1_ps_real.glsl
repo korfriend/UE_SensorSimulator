@@ -62,22 +62,17 @@ vec2 distortPoint(vec2 Array_uv)
     return uv_out;//vec2(Array_uv.x / img_width_, Array_uv.y / img_height_);
 }
 
-vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, float weightId0, int debugMode) {
+vec4 blendArea(int camId0, int camId1, vec3 pos, vec3 pos_original, mat4 viewProjs[4], int caseId, float weightId0, int debugMode) {
     const float bias0 = weightId0;//1.0;
     const float bias1 = 1.0 - weightId0;//1.0;
 
-    vec4 imagePos = viewProjs[camId0] * vec4(pos, 1.0);
+    vec4 imagePos = viewProjs[camId0] * vec4(pos_original, 1.0);
     vec2 imagePos2D = imagePos.xy / imagePos.w;
     vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
 
-    imagePos = viewProjs[camId1] * vec4(pos, 1.0);
+    imagePos = viewProjs[camId1] * vec4(pos_original, 1.0);
     imagePos2D = imagePos.xy / imagePos.w;
     vec2 texPos1 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
-
-
-    vec2 texPos0_ = distortPoint(texPos0);
-    vec2 texPos1_ = distortPoint(texPos1);
-
 
     float u0 = texPos0.x;
     float u1 = 1.0 - texPos1.x;
@@ -85,7 +80,7 @@ vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, 
     float v1 = texPos1.y;
 
     float w0 = u0, w1 = u1;
-    if (u0 > v0 && u1 > v1) 
+    if (false)//(u0 > v0 && u1 > v1) 
     {
         w0 = v0;// + u0;
         w1 = v1;// + u1;
@@ -116,21 +111,40 @@ vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, 
         }
     }
     else {
-        texPos0 = texPos0_;
-        texPos1 = texPos1_;
+        
+        imagePos = viewProjs[camId0] * vec4(pos, 1.0);
+        imagePos2D = imagePos.xy / imagePos.w;
+        texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+
+        imagePos = viewProjs[camId1] * vec4(pos, 1.0);
+        imagePos2D = imagePos.xy / imagePos.w;
+        texPos1 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+        
+        texPos0 = distortPoint(texPos0);
+        texPos1 = distortPoint(texPos1);
+
+        //texPos0 = texPos0_;
+        //texPos1 = texPos1_;
         vec4 img1 = texture(cameraImgs, vec3(texPos0.x, 1 - texPos0.y, camId0));
         vec4 img2 = texture(cameraImgs, vec3(texPos1.x, 1 - texPos1.y, camId1));
-        colorOut = w0 * img1 + w1 * img2;
 
-        ivec2 texIdx2d0 = ivec2((texPos0.x) * 500 + 0.5, (1 - texPos0.y) * 300 + 0.5);
+        ivec2 texIdx2d0 = ivec2((texPos0.x) * img_width_ + 0.5, (1 - texPos0.y) * img_height_ + 0.5);
         int semantic0 = texelFetch(semanticImgs, ivec3(texIdx2d0, camId0), 0).r;
-        ivec2 texIdx2d1 = ivec2((texPos1.x) * 500 + 0.5, (1 - texPos1.y) * 300 + 0.5);
+        ivec2 texIdx2d1 = ivec2((texPos1.x) * img_width_ + 0.5, (1 - texPos1.y) * img_height_ + 0.5);
         int semantic1 = texelFetch(semanticImgs, ivec3(texIdx2d1, camId1), 0).r;
-        if(pos.z == 100.0) {
-            if(semantic0 != 3 && semantic1 != 3) {
-                colorOut = vec4(0, 0, 0, 1);
-            }
+        if(pos.z != 0.0
+            && semantic0 == 0 
+            && semantic1 == 0) {
+            colorOut = vec4(0, 0, 0, 1);
         }
+        else {
+            colorOut = w0 * img1 + w1 * img2;
+        }
+
+        if (semantic0 == 2 || semantic1 == 2) {
+            colorOut = vec4(1, 0, 0, 1);
+        }
+
 
         //colorOut.rgb *= 255.0;
         //colorOut.r = (int(colorOut.r + 2.9)) / 255.0;
@@ -171,7 +185,7 @@ void main()
             default : colorOut = vec4(0, 0, 0, 1); break;
         }
     }
-    /*
+    
     switch(count) {
         case 0 : colorOut = vec4(0, 1, 1, 1); break;
         case 1 : colorOut = vec4(0, 1, 0, 1); break;
@@ -182,9 +196,10 @@ void main()
 #else
     
     // height correction
+    vec3 pos_original = pos;
     switch (semantic) {
-        case 1: pos.z = -100; break;
-        // case 2: pos.z = 25.0; break;
+        case 1: pos.z = -50; break;
+        case 2: pos.z = -50; break;
         // case 3: pos.z = 100; break;
         // case 4: pos.z = 100.1; break;
     }
@@ -209,7 +224,19 @@ void main()
                 vec2 imagePos2D = imagePos.xy / imagePos.w;
                 vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
                 texPos0 = distortPoint(texPos0);
-                colorOut = texture(cameraImgs, vec3(texPos0.x, (1 - texPos0.y), camId));
+
+                ivec2 texIdx2d0 = ivec2((texPos0.x) * img_width_ + 0.5, (1 - texPos0.y) * img_height_ + 0.5);
+                int semantic0 = texelFetch(semanticImgs, ivec3(texIdx2d0, camId0), 0).r;
+                if(pos.z != 0.0
+                    && semantic0 == 0) {
+                    colorOut = vec4(0, 0, 0, 1);
+                }
+                else 
+                    colorOut = texture(cameraImgs, vec3(texPos0.x, (1 - texPos0.y), camId));
+                    
+                if (semantic0 == 2) {
+                    colorOut = vec4(1, 0, 0, 1);
+        }
             }
             break;
         }
@@ -219,25 +246,25 @@ void main()
             int enc = idx0 * 2 + idx1;
 
             // TO DO : determine dynamic blending weights
-            float w01 = 0.1;
-            float w12 = 0.1;
-            float w23 = 0.9;
-            float w30 = 0.9;
+            float w01 = 0.5;
+            float w12 = 0.5;
+            float w23 = 0.5;
+            float w30 = 0.5;
             switch(enc) {
                 case 1: {
-                    colorOut = blendArea(0, 1, pos, viewProjs, enc, w01, debugMode);
+                    colorOut = blendArea(0, 1, pos, pos_original, viewProjs, enc, w01, debugMode);
                     break;
                 }
                 case 4: {
-                    colorOut = blendArea(1, 2, pos, viewProjs, enc, w12, debugMode);
+                    colorOut = blendArea(1, 2, pos, pos_original, viewProjs, enc, w12, debugMode);
                     break;
                 }
                 case 7: {
-                    colorOut = blendArea(2, 3, pos, viewProjs, enc, w23, debugMode);
+                    colorOut = blendArea(2, 3, pos, pos_original, viewProjs, enc, w23, debugMode);
                     break;
                 }
                 case 3: {
-                    colorOut = blendArea(3, 0, pos, viewProjs, enc, w30, debugMode);
+                    colorOut = blendArea(3, 0, pos, pos_original, viewProjs, enc, w30, debugMode);
                     break;
                 }
             }
