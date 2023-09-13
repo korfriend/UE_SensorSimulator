@@ -369,32 +369,32 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
         projMat.transpose_in_place()
         return projMat
 
-    def computeLookAt(camera_pos, camera_target, camera_up):
-        forward = camera_pos - camera_target
-        forward.normalize()
-        right = forward.cross(camera_up)
-        right.normalize()
-        up = right.cross(forward)
-        # print(("right {}").format(right))
-        # print(("up {}").format(up))
-        # print(("forward  {}").format(forward))
+    def computeLookAtLH(eye, center, up):
+        z = eye - center
+        z.normalize()
+        x = z.cross(up)
+        x.normalize()
+        y = x.cross(z)
+        # print(("x {}").format(x))
+        # print(("y {}").format(y))
+        # print(("z {}").format(z))
         # row major in pand3d core but memory convention is based on the conventional column major
         matLookAt = p3d.LMatrix4f(
-            right[0],
-            up[0],
-            forward[0],
+            x[0],
+            y[0],
+            z[0],
             0.0,
-            right[1],
-            up[1],
-            forward[1],
+            x[1],
+            y[1],
+            z[1],
             0.0,
-            right[2],
-            up[2],
-            forward[2],
+            x[2],
+            y[2],
+            z[2],
             0.0,
-            -p3d.LVector3f.dot(right, camera_pos),
-            -p3d.LVector3f.dot(up, camera_pos),
-            -p3d.LVector3f.dot(forward, camera_pos),
+            -p3d.LVector3f.dot(x, eye),
+            -p3d.LVector3f.dot(y, eye),
+            -p3d.LVector3f.dot(z, eye),
             1.0,
         )
         return matLookAt
@@ -461,7 +461,7 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
         camPos = camMat.xformPoint(p3d.Vec3(0, 0, 0))
         view = camMat.xformVec(p3d.Vec3(1, 0, 0))
         up = camMat.xformVec(p3d.Vec3(0, 0, 1))
-        viewMat = computeLookAt(camPos, camPos + view, up)
+        viewMat = computeLookAtLH(camPos, camPos + view, up)
 
         # viewProjMat = p3d.LMatrix4f()
         viewProjMat = viewMat * projMat

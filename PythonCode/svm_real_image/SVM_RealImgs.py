@@ -351,7 +351,7 @@ def euler_to_matrix(euler_angle):
     return R_z @ R_y @ R_x
 
 
-def computeLookAt(eye, center, up):
+def computeLookAtRH(eye, center, up):
     z = eye - center
     z.normalize()
     x = up.cross(z)
@@ -393,7 +393,7 @@ def make_view_matrix(translation, rotation_matrix):
     # print(("camPos {}").format(camPos))
     # print(("camView {}").format(camView))
     # print(("camUp  {}").format(camUp))
-    return computeLookAt(camPos, camPos + camView, camUp)
+    return computeLookAtRH(camPos, camPos + camView, camUp)
 
 
 def make_projection_matrix(fx, fy, skew_c, cx, cy, img_width, img_height, near_p, far_p):
