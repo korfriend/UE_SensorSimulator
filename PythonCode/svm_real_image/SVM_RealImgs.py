@@ -9,7 +9,11 @@ from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Shader
 
-with open("./Calibration_Simul.json") as f:
+debug_mode = True  # Set this variable to True or False to enable or disable debug mode
+
+calibration_filepath = "./Calibration_Simul_Debug.json" if debug_mode else "./Calibration_Simul.json"
+
+with open(calibration_filepath) as f:
     calibration = json.load(f)
 
 boat_breadth = calibration["boat_type"]["custom_breadth"] * 100
@@ -177,7 +181,7 @@ class SurroundView(ShowBase):
 
             bbox = svmBase.boat.getTightBounds()
             print(bbox)
-            self.waterZ = 10
+            self.waterZ = 0
             waterPlaneLength = 1000
             vertex.addData3(-waterPlaneLength, -waterPlaneLength, self.waterZ)
             vertex.addData3(waterPlaneLength, -waterPlaneLength, self.waterZ)
@@ -347,62 +351,48 @@ def euler_to_matrix(euler_angle):
     return R_z @ R_y @ R_x
 
 
-def computeLookAt(camera_pos, camera_target, camera_up):
-    forward = camera_pos - camera_target
-    forward.normalize()
-    right = forward.cross(camera_up)
-    right.normalize()
-    up = right.cross(forward)
-    # print(("right {}").format(right))
-    # print(("up {}").format(up))
-    # print(("forward  {}").format(forward))
+def computeLookAt(eye, center, up):
+    z = eye - center
+    z.normalize()
+    x = up.cross(z)
+    x.normalize()
+    y = z.cross(x)
+    # print(("x {}").format(x))
+    # print(("y {}").format(y))
+    # print(("z {}").format(z))
     # row major in pand3d core but memory convention is based on the conventional column major
     matLookAt = p3d.LMatrix4f(
-        right[0],
-        up[0],
-        forward[0],
+        x[0],
+        y[0],
+        z[0],
         0.0,
-        right[1],
-        up[1],
-        forward[1],
+        x[1],
+        y[1],
+        z[1],
         0.0,
-        right[2],
-        up[2],
-        forward[2],
+        x[2],
+        y[2],
+        z[2],
         0.0,
-        -p3d.LVector3f.dot(right, camera_pos),
-        -p3d.LVector3f.dot(up, camera_pos),
-        -p3d.LVector3f.dot(forward, camera_pos),
+        -p3d.LVector3f.dot(x, eye),
+        -p3d.LVector3f.dot(y, eye),
+        -p3d.LVector3f.dot(z, eye),
         1.0,
     )
     return matLookAt
 
 
 def make_view_matrix(translation, rotation_matrix):
-    T = p3d.LMatrix4f().translateMat(translation[0], translation[1], translation[2])
-
-    R = p3d.LMatrix4f()
-    R[0][0] = rotation_matrix[0][0]
-    R[0][1] = rotation_matrix[0][1]
-    R[0][2] = rotation_matrix[0][2]
-    R[1][0] = rotation_matrix[1][0]
-    R[1][1] = rotation_matrix[1][1]
-    R[1][2] = rotation_matrix[1][2]
-    R[2][0] = rotation_matrix[2][0]
-    R[2][1] = rotation_matrix[2][1]
-    R[2][2] = rotation_matrix[2][2]
-
+    T = p3d.LMatrix4f().translateMat(*translation)
+    R = p3d.LMatrix4f(p3d.LMatrix3f(*rotation_matrix.flatten()))
     R.transposeInPlace()
     view2world = R * T
-
     camPos = view2world.xformPoint(p3d.Vec3(0, 0, 0))
     camView = view2world.xformVec(p3d.Vec3(0, 0, 1)).normalized()
     camUp = view2world.xformVec(p3d.Vec3(0, -1, 0)).normalized()
-
-    print(("camPos {}").format(camPos))
-    print(("camView {}").format(camView))
-    print(("camUp  {}").format(camUp))
-
+    # print(("camPos {}").format(camPos))
+    # print(("camView {}").format(camView))
+    # print(("camUp  {}").format(camUp))
     return computeLookAt(camPos, camPos + camView, camUp)
 
 
@@ -411,7 +401,7 @@ def make_projection_matrix(fx, fy, skew_c, cx, cy, img_width, img_height, near_p
     qn = far_p * near_p / (near_p - far_p)
 
     projection_matrix = p3d.LMatrix4f()
-    projection_matrix[0][0] = -2.0 * fx / img_width
+    projection_matrix[0][0] = 2.0 * fx / img_width
     projection_matrix[1][0] = -2.0 * skew_c / img_width
     projection_matrix[2][0] = (img_width + 2.0 * 0 - 2.0 * cx) / img_width
     projection_matrix[3][0] = 0
@@ -455,15 +445,8 @@ def InitSVM(base, imageWidth, imageHeight):
     print("Texture Initialized!")
 
 
-base_path = "./data"
+base_path = "./data/ws_segmenet"
 camera_positions = ["front", "right", "rear", "left"]
-image_paths = {
-    position: sorted(os.listdir(os.path.join(base_path, position, "images"))) for position in camera_positions
-}
-semantic_paths = {
-    position: sorted(os.listdir(os.path.join(base_path, position, "labels"))) for position in camera_positions
-}
-num_images = len(image_paths["front"])
 
 current_idx = 0
 
@@ -482,7 +465,9 @@ def loadNextImage(task):
         imgs.append(img)
 
         # Load semantic image
-        semantic = cv.imread(os.path.join(base_path, position, "labels", semantic_paths[position][current_idx]))
+        semantic = cv.imread(
+            os.path.join(base_path, position, "pseudo_color_prediction", semantic_paths[position][current_idx])
+        )
         semantic = cv.resize(semantic, (img_width, img_height))
         semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
         semantics.append(semantic)
@@ -502,8 +487,44 @@ def loadNextImage(task):
     return Task.cont
 
 
+def loadDebugImages():
+    imgs = []
+    semantics = []
+
+    for position in camera_positions:
+        # Load debug image
+        img = cv.imread(f"./{position}.png")
+        img = cv.resize(img, (img_width, img_height))
+        img = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
+        imgs.append(img)
+
+        # Load debug semantic image
+        semantic = cv.imread(f"./semantic_{position}.png")
+        semantic = cv.resize(semantic, (img_width, img_height))
+        semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
+        semantics.append(semantic)
+
+    imgnpArray = np.array(imgs).astype(np.uint8)
+    imgArray = imgnpArray.reshape((4, img_width, img_height, 4))
+    cameraArray = imgArray[:, :, :, :].copy()
+    semanticArray = np.array(semantics).astype(np.int32)
+
+    mySvm.planeTexArray.setRamImage(cameraArray)
+    mySvm.semanticTexArray.setRamImage(semanticArray)
+
+
 if __name__ == "__main__":
     mySvm = SurroundView()
+
+    if not debug_mode:
+        image_paths = {
+            position: sorted(os.listdir(os.path.join(base_path, position, "images"))) for position in camera_positions
+        }
+        semantic_paths = {
+            position: sorted(os.listdir(os.path.join(base_path, position, "pseudo_color_prediction")))
+            for position in camera_positions
+        }
+        num_images = len(image_paths[camera_positions[0]])
 
     width = mySvm.win.get_x_size()
     height = mySvm.win.get_y_size()
@@ -511,6 +532,9 @@ if __name__ == "__main__":
 
     InitSVM(mySvm, img_width, img_height)
 
-    mySvm.taskMgr.add(loadNextImage, "loadNextImageTask", sort=1, uponDeath=exit)
+    if debug_mode:
+        loadDebugImages()
+    else:
+        mySvm.taskMgr.add(loadNextImage, "loadNextImageTask", sort=1, uponDeath=exit)
 
     mySvm.run()

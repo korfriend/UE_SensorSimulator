@@ -183,7 +183,7 @@ void main()
     
     // height correction
     switch (semantic) {
-        case 1: pos.z = -150; break;
+        case 1: pos.z = -100; break;
         // case 2: pos.z = 25.0; break;
         // case 3: pos.z = 100; break;
         // case 4: pos.z = 100.1; break;
