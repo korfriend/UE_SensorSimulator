@@ -1,8 +1,8 @@
 {
   "backup_file": "string",
   "boat_type": {
-    "custom_breadth": 3.0,
-    "custom_length": 9.32
+    "custom_breadth": 4.2,
+    "custom_length": 12.8
   },
   "individual_view_parameter": {
     "cameras": [

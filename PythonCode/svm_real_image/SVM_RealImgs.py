@@ -145,8 +145,12 @@ class SurroundView(ShowBase):
         self.cam2 = self.makeCamera(self.buffer2, scene=self.renderObj, lens=self.cam.node().getLens())
         self.cam2.reparentTo(self.cam)
 
-        self.boat = self.loader.loadModel("avikus_boat.glb")
-        self.boat.setHpr(90, -90, 180)
+        if debug_mode:
+            self.boat = self.loader.loadModel("raymarine_model.glb")
+            self.boat.setHpr(0, -90, 0)
+        else:
+            self.boat = self.loader.loadModel("avikus_boat.glb")
+            self.boat.setHpr(90, -90, 180)
 
         bbox = self.boat.getTightBounds()
         scale_x = boat_length / (bbox[1].x - bbox[0].x)
