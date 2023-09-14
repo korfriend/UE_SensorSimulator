@@ -19,6 +19,11 @@ uniform sampler2D texGeoInfo2; // from sceneObj
 uniform sampler2DArray cameraImgs;
 uniform isampler2DArray semanticImgs;
 
+uniform float w01;
+uniform float w12;
+uniform float w23;
+uniform float w30;
+
 const float K1_ = 1.281584985127447;
 const float K2_ = 0.170043067138006;
 const float K3_ = -0.023341058557079;
@@ -141,9 +146,10 @@ vec4 blendArea(int camId0, int camId1, vec3 pos, vec3 pos_original, mat4 viewPro
             colorOut = w0 * img1 + w1 * img2;
         }
 
-        if (semantic0 == 2 || semantic1 == 2) {
-            colorOut = vec4(1, 0, 0, 1);
-        }
+        // if (semantic0 == 2 || semantic1 == 2)
+        //     colorOut += vec4(0.5, 0, 0, 1);
+        // else if (semantic0 == 1 || semantic1 == 1)
+        //     colorOut += vec4(0, 0, 0.5, 1);
 
 
         //colorOut.rgb *= 255.0;
@@ -173,7 +179,7 @@ void main()
     int camId1 = geoInfo0.z;
 
     vec4 colorOut = vec4(0, 0, 0, 1);
-//#define MYDEBUG__
+// #define MYDEBUG__
 #ifdef MYDEBUG__ 
     
     if (count > 0) {
@@ -234,9 +240,10 @@ void main()
                 else 
                     colorOut = texture(cameraImgs, vec3(texPos0.x, (1 - texPos0.y), camId));
                     
-                if (semantic0 == 2) {
-                    colorOut = vec4(1, 0, 0, 1);
-        }
+                // if (semantic0 == 2)
+                //     colorOut += vec4(0.5, 0, 0, 1);
+                // else if (semantic0 == 1)
+                //     colorOut += vec4(0, 0, 0.5, 1);
             }
             break;
         }
@@ -246,10 +253,10 @@ void main()
             int enc = idx0 * 2 + idx1;
 
             // TO DO : determine dynamic blending weights
-            float w01 = 0.5;
-            float w12 = 0.5;
-            float w23 = 0.5;
-            float w30 = 0.5;
+            // float w01 = 0.5;
+            // float w12 = 0.5;
+            // float w23 = 0.5;
+            // float w30 = 0.5;
             switch(enc) {
                 case 1: {
                     colorOut = blendArea(0, 1, pos, pos_original, viewProjs, enc, w01, debugMode);
@@ -278,17 +285,26 @@ void main()
                 camId = idx0;
             else if (idx1 == 0 || idx1 == 2)
                 camId = idx1;
-            vec4 imagePos = viewProjs[camId] * vec4(pos, 1.0);
-            if (imagePos.w <= 0.001) imagePos.w = 0.001;
-            vec2 imagePos2D = imagePos.xy / imagePos.w;
-            vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
-            texPos0 = distortPoint(texPos0);
-            colorOut = texture(cameraImgs, vec3(texPos0.x, (1 - texPos0.y), camId));
-            break;
+            if(debugMode == 1) {
+                switch(camId) {
+                    case 0: colorOut = vec4(1, 0, 0, 1); break;
+                    case 1: colorOut = vec4(0, 1, 0, 1); break;
+                    case 2: colorOut = vec4(0, 0, 1, 1); break;
+                    case 3: colorOut = vec4(1, 1, 1, 1); break;
+                }
+            } else {
+                vec4 imagePos = viewProjs[camId] * vec4(pos, 1.0);
+                if (imagePos.w <= 0.001) imagePos.w = 0.001;
+                vec2 imagePos2D = imagePos.xy / imagePos.w;
+                vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+                texPos0 = distortPoint(texPos0);
+                colorOut = texture(cameraImgs, vec3(texPos0.x, (1 - texPos0.y), camId));
+                break;
+            }
         }
     }
 #endif
-    //if (sceneColor.r + sceneColor.g + sceneColor.b > 0)
+    // if (sceneColor.r + sceneColor.g + sceneColor.b > 0)
     //    colorOut = sceneColor;
 
     p3d_FragColor = colorOut;
