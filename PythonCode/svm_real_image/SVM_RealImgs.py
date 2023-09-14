@@ -162,19 +162,23 @@ class SurroundView(ShowBase):
         self.boat.setPos(-origin.x, -origin.y, 0)
         self.boat.reparentTo(self.renderObj)
 
-        self.axis = self.loader.loadModel("zup-axis")
-        self.axis.setPos(0, 0, 0)
+        # self.axis = self.loader.loadModel("zup-axis")
+        # self.axis.setPos(0, 0, 0)
         # self.axis.setHpr(180, 0, 0)
-        self.axis.setScale(100)
-        self.axis.reparentTo(self.renderObj)
+        # self.axis.setScale(100)
+        # self.axis.reparentTo(self.renderObj)
 
-        manager = FilterManager(self.win, self.cam)
-        self.tex = p3d.Texture()
-        self.finalquad = manager.renderSceneInto(colortex=None)
-        self.interquad = manager.renderQuadInto(colortex=self.tex)  # make dummy texture... for post processing...
+        self.manager = FilterManager(self.win, self.cam)
+        tex = p3d.Texture()
+        self.finalquad = self.manager.renderSceneInto(colortex=None)
+        self.interquad = self.manager.renderQuadInto(colortex=None)  # make dummy texture... for post processing...
+        self.manager.buffers[1].clearRenderTextures()
+        self.manager.buffers[1].addRenderTexture(
+            tex, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color
+        )
         self.interquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps_real.glsl"))
         self.finalquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post2_ps_real.glsl"))
-        self.finalquad.setShaderInput("tex", self.tex)
+        self.finalquad.setShaderInput("tex", self.manager.buffers[1].getTexture(0))
         self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.interquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
@@ -268,6 +272,7 @@ class SurroundView(ShowBase):
     def readTextureData(self, task):
         self.buffer1.set_active(True)
         self.buffer2.set_active(True)
+        self.manager.buffers[1].set_active(True)
         self.win.set_active(False)
         self.graphics_engine.render_frame()
 
@@ -285,6 +290,7 @@ class SurroundView(ShowBase):
         tex0.setRamImage(array0)
         self.interquad.setShaderInput("texGeoInfo0", tex0)
 
+        # dynamic blending weight
         mapProp = np.flip(array0[:, :, 2], 0)
         overlapIndex0 = np.flip(array0[:, :, 1], 0)
         overlapIndex1 = np.flip(array0[:, :, 0], 0)
@@ -324,8 +330,25 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w23", self.w23)
         self.interquad.setShaderInput("w30", self.w30)
 
+        # read-back
+        tex = self.manager.buffers[1].getTexture(0)
+        tex_data = tex.get_ram_image()
+        np_texture = np.frombuffer(tex_data, np.uint8)
+        np_texture = np_texture.reshape((tex.get_y_size(), tex.get_x_size(), 4))
+
+        # inpainting
+        array = np_texture.copy()
+        img = cv.cvtColor(array, cv.COLOR_BGRA2BGR)
+        mask = cv.inRange(img, (0, 0, 0), (0, 0, 0))
+        dst = cv.inpaint(img, mask, 3, cv.INPAINT_TELEA)
+        array = cv.cvtColor(dst, cv.COLOR_BGR2BGRA)
+
+        tex.setRamImage(array)
+        self.finalquad.setShaderInput("tex", tex)
+
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
+        self.manager.buffers[1].set_active(False)
         self.win.set_active(True)
         return task.cont
 
