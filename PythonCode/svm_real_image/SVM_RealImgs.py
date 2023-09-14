@@ -169,12 +169,15 @@ class SurroundView(ShowBase):
         self.axis.reparentTo(self.renderObj)
 
         manager = FilterManager(self.win, self.cam)
-        self.quad = manager.renderSceneInto(colortex=None)  # make dummy texture... for post processing...
-        # mySvm.quad = manager.renderQuadInto(colortex=tex)
-        self.quad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps_real.glsl"))
-        self.quad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
-        self.quad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
-        self.quad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
+        self.tex = p3d.Texture()
+        self.finalquad = manager.renderSceneInto(colortex=None)
+        self.interquad = manager.renderQuadInto(colortex=self.tex)  # make dummy texture... for post processing...
+        self.interquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps_real.glsl"))
+        self.finalquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post2_ps_real.glsl"))
+        self.finalquad.setShaderInput("tex", self.tex)
+        self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
+        self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
+        self.interquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
 
         def GeneratePlaneNode(svmBase):
             # shader setting for SVM
@@ -218,14 +221,14 @@ class SurroundView(ShowBase):
             # svmBase.planeTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
             for i in range(4):
                 svmBase.plane.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-                svmBase.quad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
+                svmBase.interquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
 
             svmBase.planeTexArray = p3d.Texture()
             svmBase.planeTexArray.setup2dTextureArray(
                 img_width, img_height, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
             )
             svmBase.plane.setShaderInput("cameraImgs", svmBase.planeTexArray)
-            svmBase.quad.setShaderInput("cameraImgs", svmBase.planeTexArray)
+            svmBase.interquad.setShaderInput("cameraImgs", svmBase.planeTexArray)
 
             svmBase.camPositions = [p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f()]
             svmBase.plane.setShaderInput("camPositions", svmBase.camPositions)
@@ -238,7 +241,7 @@ class SurroundView(ShowBase):
             )
             print(img_width, img_height)
             svmBase.plane.setShaderInput("semanticImgs", svmBase.semanticTexArray)
-            svmBase.quad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
+            svmBase.interquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
 
         GeneratePlaneNode(self)
         self.plane.reparentTo(self.renderSVM)
@@ -270,7 +273,7 @@ class SurroundView(ShowBase):
         # to do with array0, array1
         array0 = np_texture0.copy()
         tex0.setRamImage(array0)
-        self.quad.setShaderInput("texGeoInfo0", tex0)
+        self.interquad.setShaderInput("texGeoInfo0", tex0)
 
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
@@ -281,7 +284,8 @@ class SurroundView(ShowBase):
         self.planeShader = Shader.load(Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps_plane_real.glsl")
         self.plane.setShader(self.planeShader)
 
-        self.quad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps_real.glsl"))
+        self.interquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps_real.glsl"))
+        self.finalquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post2_ps_real.glsl"))
 
 
 def make_extrinsic_matrix(extrinsic):
@@ -439,7 +443,7 @@ def InitSVM(base, imageWidth, imageHeight):
         matViewProjs[i] = matViewProj
 
         base.plane.setShaderInput("matViewProj" + str(i), matViewProj)
-        base.quad.setShaderInput("matViewProj" + str(i), matViewProj)
+        base.interquad.setShaderInput("matViewProj" + str(i), matViewProj)
 
     base.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
     base.plane.setShaderInput("cameraImgs", base.planeTexArray)
