@@ -145,12 +145,19 @@ class SurroundView(ShowBase):
         self.cam2 = self.makeCamera(self.buffer2, scene=self.renderObj, lens=self.cam.node().getLens())
         self.cam2.reparentTo(self.cam)
 
-        if debug_mode:
-            self.boat = self.loader.loadModel("raymarine_model.glb")
-            self.boat.setHpr(0, -90, 0)
-        else:
-            self.boat = self.loader.loadModel("avikus_boat.glb")
-            self.boat.setHpr(90, -90, 180)
+        alight = p3d.AmbientLight("alight")
+        alight.setColor((0.2, 0.2, 0.2, 1))
+        alnp = self.renderObj.attachNewNode(alight)
+        self.renderObj.setLight(alnp)
+
+        plight = p3d.PointLight("plight")
+        plight.setColor((0.8, 0.8, 0.8, 1))
+        plnp = self.renderObj.attachNewNode(plight)
+        plnp.setPos(0, 0, -4000)
+        self.renderObj.setLight(plnp)
+
+        self.boat = self.loader.loadModel("avikus_boat.glb")
+        self.boat.setHpr(90, -90, 180)
 
         bbox = self.boat.getTightBounds()
         scale_x = boat_length / (bbox[1].x - bbox[0].x)
@@ -162,11 +169,10 @@ class SurroundView(ShowBase):
         self.boat.setPos(-origin.x, -origin.y, 0)
         self.boat.reparentTo(self.renderObj)
 
-        # self.axis = self.loader.loadModel("zup-axis")
-        # self.axis.setPos(0, 0, 0)
-        # self.axis.setHpr(180, 0, 0)
-        # self.axis.setScale(100)
-        # self.axis.reparentTo(self.renderObj)
+        self.axis = self.loader.loadModel("zup-axis")
+        self.axis.setPos(0, 0, 0)
+        self.axis.setScale(100)
+        self.axis.reparentTo(self.renderObj)
 
         self.manager = FilterManager(self.win, self.cam)
         tex = p3d.Texture()
@@ -182,6 +188,9 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.interquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
+        self.finalquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
+        self.finalquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
+        self.finalquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
 
         self.w01 = 0.5
         self.w12 = 0.5
@@ -236,6 +245,7 @@ class SurroundView(ShowBase):
             for i in range(4):
                 svmBase.plane.setShaderInput("matViewProj" + str(i), p3d.Mat4())
                 svmBase.interquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
+                svmBase.finalquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
 
             svmBase.planeTexArray = p3d.Texture()
             svmBase.planeTexArray.setup2dTextureArray(
@@ -243,6 +253,7 @@ class SurroundView(ShowBase):
             )
             svmBase.plane.setShaderInput("cameraImgs", svmBase.planeTexArray)
             svmBase.interquad.setShaderInput("cameraImgs", svmBase.planeTexArray)
+            # svmBase.finalquad.setShaderInput("cameraImgs", svmBase.planeTexArray)
 
             svmBase.camPositions = [p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f()]
             svmBase.plane.setShaderInput("camPositions", svmBase.camPositions)
@@ -256,6 +267,7 @@ class SurroundView(ShowBase):
             print(img_width, img_height)
             svmBase.plane.setShaderInput("semanticImgs", svmBase.semanticTexArray)
             svmBase.interquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
+            svmBase.finalquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
 
         GeneratePlaneNode(self)
         self.plane.reparentTo(self.renderSVM)
@@ -516,6 +528,7 @@ def InitSVM(base, imageWidth, imageHeight):
 
         base.plane.setShaderInput("matViewProj" + str(i), matViewProj)
         base.interquad.setShaderInput("matViewProj" + str(i), matViewProj)
+        base.finalquad.setShaderInput("matViewProj" + str(i), matViewProj)
 
     base.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
     base.plane.setShaderInput("cameraImgs", base.planeTexArray)
