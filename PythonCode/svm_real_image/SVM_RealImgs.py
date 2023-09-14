@@ -179,6 +179,16 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.interquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
 
+        self.w01 = 0.5
+        self.w12 = 0.5
+        self.w23 = 0.5
+        self.w30 = 0.5
+
+        self.interquad.setShaderInput("w01", self.w01)
+        self.interquad.setShaderInput("w12", self.w12)
+        self.interquad.setShaderInput("w23", self.w23)
+        self.interquad.setShaderInput("w30", self.w30)
+
         def GeneratePlaneNode(svmBase):
             # shader setting for SVM
             svmBase.planeShader = Shader.load(Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps_plane_real.glsl")
@@ -274,6 +284,45 @@ class SurroundView(ShowBase):
         array0 = np_texture0.copy()
         tex0.setRamImage(array0)
         self.interquad.setShaderInput("texGeoInfo0", tex0)
+
+        mapProp = np.flip(array0[:, :, 2], 0)
+        overlapIndex0 = np.flip(array0[:, :, 1], 0)
+        overlapIndex1 = np.flip(array0[:, :, 0], 0)
+        count = np.flip(array0[:, :, 3], 0)
+
+        condition_mask = (mapProp == 2) & (count > 1)
+
+        camId0 = overlapIndex0[condition_mask]
+        camId1 = overlapIndex1[condition_mask]
+
+        combined_array = np.concatenate((camId0, camId1))
+
+        element_counts = np.bincount(combined_array, minlength=4)
+
+        if element_counts[0] > element_counts[1]:
+            self.w01 = 0.1
+        elif element_counts[0] < element_counts[1]:
+            self.w01 = 0.9
+
+        if element_counts[1] > element_counts[2]:
+            self.w12 = 0.1
+        elif element_counts[1] < element_counts[2]:
+            self.w12 = 0.9
+
+        if element_counts[2] > element_counts[3]:
+            self.w23 = 0.1
+        elif element_counts[2] < element_counts[3]:
+            self.w23 = 0.9
+
+        if element_counts[3] > element_counts[0]:
+            self.w30 = 0.1
+        elif element_counts[3] < element_counts[0]:
+            self.w30 = 0.9
+
+        self.interquad.setShaderInput("w01", self.w01)
+        self.interquad.setShaderInput("w12", self.w12)
+        self.interquad.setShaderInput("w23", self.w23)
+        self.interquad.setShaderInput("w30", self.w30)
 
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
@@ -477,7 +526,7 @@ def loadNextImage(task):
         semantic = cv.imread(
             os.path.join(base_path, position, "pseudo_color_prediction", semantic_paths[position][current_idx])
         )
-        semantic = cv.resize(semantic, (img_width, img_height))
+        semantic = cv.resize(semantic, (img_width, img_height), cv.INTER_NEAREST)
         semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
         semantics.append(semantic)
 
@@ -500,6 +549,8 @@ def loadDebugImages():
     imgs = []
     semantics = []
 
+    mapProp = []
+
     for position in camera_positions:
         # Load debug image
         img = cv.imread(f"./{position}.png")
@@ -509,9 +560,11 @@ def loadDebugImages():
 
         # Load debug semantic image
         semantic = cv.imread(f"./semantic_{position}.png")
-        semantic = cv.resize(semantic, (img_width, img_height))
+        semantic = cv.resize(semantic, (img_width, img_height), cv.INTER_NEAREST)
         semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
         semantics.append(semantic)
+
+        mapProp.append(np.max(semantic))
 
     imgnpArray = np.array(imgs).astype(np.uint8)
     imgArray = imgnpArray.reshape((4, img_width, img_height, 4))
@@ -520,6 +573,11 @@ def loadDebugImages():
 
     mySvm.planeTexArray.setRamImage(cameraArray)
     mySvm.semanticTexArray.setRamImage(semanticArray)
+
+    mySvm.w01 = 0.1 if mapProp[0] > mapProp[1] else 0.9 if mapProp[1] > mapProp[0] else 0.5
+    mySvm.w12 = 0.1 if mapProp[1] > mapProp[2] else 0.9 if mapProp[2] > mapProp[1] else 0.5
+    mySvm.w23 = 0.1 if mapProp[2] > mapProp[3] else 0.9 if mapProp[3] > mapProp[2] else 0.5
+    mySvm.w30 = 0.1 if mapProp[3] > mapProp[0] else 0.9 if mapProp[0] > mapProp[3] else 0.5
 
 
 if __name__ == "__main__":

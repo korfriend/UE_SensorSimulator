@@ -19,6 +19,11 @@ uniform sampler2D texGeoInfo2; // from sceneObj
 uniform sampler2DArray cameraImgs;
 uniform isampler2DArray semanticImgs;
 
+uniform float w01;
+uniform float w12;
+uniform float w23;
+uniform float w30;
+
 const float K1_ = 1.281584985127447;
 const float K2_ = 0.170043067138006;
 const float K3_ = -0.023341058557079;
@@ -248,10 +253,10 @@ void main()
             int enc = idx0 * 2 + idx1;
 
             // TO DO : determine dynamic blending weights
-            float w01 = 0.5;
-            float w12 = 0.5;
-            float w23 = 0.5;
-            float w30 = 0.5;
+            // float w01 = 0.5;
+            // float w12 = 0.5;
+            // float w23 = 0.5;
+            // float w30 = 0.5;
             switch(enc) {
                 case 1: {
                     colorOut = blendArea(0, 1, pos, pos_original, viewProjs, enc, w01, debugMode);
