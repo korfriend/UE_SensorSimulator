@@ -203,7 +203,7 @@ void main()
     
     // height correction
     vec3 pos_original = pos;
-    switch (semantic) {
+    switch (semantic / 100) {
         case 1: pos.z = -50; break;
         case 2: pos.z = -50; break;
         // case 3: pos.z = 100; break;

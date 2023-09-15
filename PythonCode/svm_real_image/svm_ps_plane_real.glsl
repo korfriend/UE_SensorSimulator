@@ -91,7 +91,7 @@ void main() {
                 const ivec2 texIdx2d = ivec2((texPos.x) * img_width_ + 0.5, (1 - texPos.y) * img_height_ + 0.5);
                 int semantic = texelFetch(semanticImgs, ivec3(texIdx2d, i), 0).r;
                 //if(semantic == 0) semantic = 1;
-                if (semantic > mapProp) mapProp = semantic;
+                if (semantic > mapProp / 100) mapProp = semantic * 100 + i;
         }
     }
 

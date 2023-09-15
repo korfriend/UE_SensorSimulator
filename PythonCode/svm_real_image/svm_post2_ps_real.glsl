@@ -81,7 +81,7 @@ void main()
     vec4 colorOut = texture(tex, l_texcoord0);
 
     // height correction
-    switch (semantic) {
+    switch (semantic / 100) {
         case 1: pos.z = -50; break;
         case 2: pos.z = -50; break;
     }

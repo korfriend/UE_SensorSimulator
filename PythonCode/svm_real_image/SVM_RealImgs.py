@@ -193,15 +193,10 @@ class SurroundView(ShowBase):
         self.finalquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.finalquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
 
-        self.w01 = 0.5
-        self.w12 = 0.5
-        self.w23 = 0.5
-        self.w30 = 0.5
-
-        self.interquad.setShaderInput("w01", self.w01)
-        self.interquad.setShaderInput("w12", self.w12)
-        self.interquad.setShaderInput("w23", self.w23)
-        self.interquad.setShaderInput("w30", self.w30)
+        self.interquad.setShaderInput("w01", 0.5)
+        self.interquad.setShaderInput("w12", 0.5)
+        self.interquad.setShaderInput("w23", 0.5)
+        self.interquad.setShaderInput("w30", 0.5)
 
         def GeneratePlaneNode(svmBase):
             # shader setting for SVM
@@ -309,39 +304,50 @@ class SurroundView(ShowBase):
         overlapIndex1 = np.flip(array0[:, :, 0], 0)
         count = np.flip(array0[:, :, 3], 0)
 
-        condition_mask = (mapProp == 2) & (count > 1)
+        semantic = mapProp // 100
+        camId = mapProp % 100
+        overlapIndex0 = np.where(count > 1, overlapIndex0, 255)
+        overlapIndex1 = np.where(count > 1, overlapIndex1, 255)
 
-        camId0 = overlapIndex0[condition_mask]
-        camId1 = overlapIndex1[condition_mask]
+        cam0 = np.where((overlapIndex0 == 0) | (overlapIndex1 == 0), 1, 0)
+        cam1 = np.where((overlapIndex0 == 1) | (overlapIndex1 == 1), 1, 0)
+        cam2 = np.where((overlapIndex0 == 2) | (overlapIndex1 == 2), 1, 0)
+        cam3 = np.where((overlapIndex0 == 3) | (overlapIndex1 == 3), 1, 0)
 
-        combined_array = np.concatenate((camId0, camId1))
+        semantic01 = np.where(cam0 & cam1, semantic, 0)
+        semantic12 = np.where(cam1 & cam2, semantic, 0)
+        semantic23 = np.where(cam2 & cam3, semantic, 0)
+        semantic30 = np.where(cam3 & cam0, semantic, 0)
 
-        element_counts = np.bincount(combined_array, minlength=4)
+        w = [0.5, 0.5, 0.5, 0.5]
 
-        if element_counts[0] > element_counts[1]:
-            self.w01 = 0.1
-        elif element_counts[0] < element_counts[1]:
-            self.w01 = 0.9
+        overlap_semantics = [semantic01, semantic12, semantic23, semantic30]
 
-        if element_counts[1] > element_counts[2]:
-            self.w12 = 0.1
-        elif element_counts[1] < element_counts[2]:
-            self.w12 = 0.9
+        # sets blending weights w based on the highest semantic value
+        for semantic_value in range(1, np.max(semantic) + 1):
+            for i, overlap_semantic in enumerate(overlap_semantics):
+                camId0 = i
+                camId1 = (i + 1) % 4
 
-        if element_counts[2] > element_counts[3]:
-            self.w23 = 0.1
-        elif element_counts[2] < element_counts[3]:
-            self.w23 = 0.9
+                camId_values = camId[overlap_semantic == semantic_value]
 
-        if element_counts[3] > element_counts[0]:
-            self.w30 = 0.1
-        elif element_counts[3] < element_counts[0]:
-            self.w30 = 0.9
+                if camId_values.size == 0:
+                    continue
 
-        self.interquad.setShaderInput("w01", self.w01)
-        self.interquad.setShaderInput("w12", self.w12)
-        self.interquad.setShaderInput("w23", self.w23)
-        self.interquad.setShaderInput("w30", self.w30)
+                unique_values, counts = np.unique(camId_values, return_counts=True)
+                ratios = counts / np.sum(counts)
+
+                if ratios[unique_values == camId0].size > 0:
+                    w[i] = 1 - ratios[unique_values == i][0]
+                elif ratios[unique_values == camId1].size > 0:
+                    w[i] = ratios[unique_values == i + 1][0]
+
+        w = np.clip(w, 0.1, 0.9)
+
+        self.interquad.setShaderInput("w01", w[0])
+        self.interquad.setShaderInput("w12", w[1])
+        self.interquad.setShaderInput("w23", w[2])
+        self.interquad.setShaderInput("w30", w[3])
 
         # read-back
         tex = self.manager.buffers[1].getTexture(0)
@@ -610,11 +616,6 @@ def loadDebugImages():
 
     mySvm.planeTexArray.setRamImage(cameraArray)
     mySvm.semanticTexArray.setRamImage(semanticArray)
-
-    mySvm.w01 = 0.1 if mapProp[0] > mapProp[1] else 0.9 if mapProp[1] > mapProp[0] else 0.5
-    mySvm.w12 = 0.1 if mapProp[1] > mapProp[2] else 0.9 if mapProp[2] > mapProp[1] else 0.5
-    mySvm.w23 = 0.1 if mapProp[2] > mapProp[3] else 0.9 if mapProp[3] > mapProp[2] else 0.5
-    mySvm.w30 = 0.1 if mapProp[3] > mapProp[0] else 0.9 if mapProp[0] > mapProp[3] else 0.5
 
 
 if __name__ == "__main__":
