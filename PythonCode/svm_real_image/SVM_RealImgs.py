@@ -9,17 +9,15 @@ from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Shader
 
-debug_mode = True  # Set this variable to True or False to enable or disable debug mode
+debug_mode = False  # Set this variable to True or False to enable or disable debug mode
 
-calibration_filepath = "./Calibration_Simul_Debug.json" if debug_mode else "./Calibration_Simul.json"
+with open("./config_raymarine.json") as f:
+    calib = json.load(f)
 
-with open(calibration_filepath) as f:
-    calibration = json.load(f)
+boat_breadth = calib["boat_type"]["custom_breadth"] * 100
+boat_length = calib["boat_type"]["custom_length"] * 100
 
-boat_breadth = calibration["boat_type"]["custom_breadth"] * 100
-boat_length = calibration["boat_type"]["custom_length"] * 100
-
-extrinsic_parameter = calibration["extrinsic_parameter"]["cameras"]
+extrinsic_parameter = calib["extrinsic_parameter"]["cameras"]
 del extrinsic_parameter[1:3]
 extrinsic_parameter[2], extrinsic_parameter[3] = extrinsic_parameter[3], extrinsic_parameter[2]
 for extrinsic in extrinsic_parameter:
@@ -156,7 +154,7 @@ class SurroundView(ShowBase):
         plnp.setPos(0, 0, -4000)
         self.renderObj.setLight(plnp)
 
-        self.boat = self.loader.loadModel("avikus_boat.glb")
+        self.boat = self.loader.loadModel("./src/avikus_boat.glb")
         # self.boat.setHpr(90, -90, 180)
         self.boat.setHpr(90, 0, 180)
 
@@ -183,8 +181,12 @@ class SurroundView(ShowBase):
         self.manager.buffers[1].addRenderTexture(
             tex, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color
         )
-        self.interquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps_real.glsl"))
-        self.finalquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post2_ps_real.glsl"))
+        self.interquad.setShader(
+            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post1_ps_real.glsl")
+        )
+        self.finalquad.setShader(
+            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post2_ps_real.glsl")
+        )
         self.finalquad.setShaderInput("tex", self.manager.buffers[1].getTexture(0))
         self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
@@ -200,14 +202,16 @@ class SurroundView(ShowBase):
 
         def GeneratePlaneNode(svmBase):
             # shader setting for SVM
-            svmBase.planeShader = Shader.load(Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps_plane_real.glsl")
+            svmBase.planeShader = Shader.load(
+                Shader.SL_GLSL, vertex="glsl/svm_vs.glsl", fragment="glsl/svm_ps_plane_real.glsl"
+            )
             vdata = p3d.GeomVertexData("triangle_data", p3d.GeomVertexFormat.getV3t2(), p3d.Geom.UHStatic)
             vdata.setNumRows(4)  # optional for performance enhancement!
             vertex = p3d.GeomVertexWriter(vdata, "vertex")
             texcoord = p3d.GeomVertexWriter(vdata, "texcoord")
 
             bbox = svmBase.boat.getTightBounds()
-            print(bbox)
+            # print(bbox)
             self.waterZ = 0
             waterPlaneLength = 1000
             vertex.addData3(-waterPlaneLength, -waterPlaneLength, self.waterZ)
@@ -260,7 +264,7 @@ class SurroundView(ShowBase):
             svmBase.semanticTexArray.setup2dTextureArray(
                 img_width, img_height, 4, p3d.Texture.T_int, p3d.Texture.F_r32i
             )
-            print(img_width, img_height)
+            # print(img_width, img_height)
             svmBase.plane.setShaderInput("semanticImgs", svmBase.semanticTexArray)
             svmBase.interquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
             svmBase.finalquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
@@ -372,34 +376,40 @@ class SurroundView(ShowBase):
         return task.cont
 
     def shaderRecompile(self):
-        self.planeShader = Shader.load(Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps_plane_real.glsl")
+        self.planeShader = Shader.load(
+            Shader.SL_GLSL, vertex="glsl/svm_vs.glsl", fragment="glsl/svm_ps_plane_real.glsl"
+        )
         self.plane.setShader(self.planeShader)
 
-        self.interquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps_real.glsl"))
-        self.finalquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post2_ps_real.glsl"))
+        self.interquad.setShader(
+            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post1_ps_real.glsl")
+        )
+        self.finalquad.setShader(
+            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post2_ps_real.glsl")
+        )
 
 
 def make_extrinsic_matrix(extrinsic):
     defaultYaw = 0
-    camera_position = int(extrinsic["camera_position"])
-    if camera_position == 1:
-        print("position is front")
-        defaultYaw = 0
-    elif camera_position == 2:
-        print("position is blind right")
-        defaultYaw = 90
-    elif camera_position == 3:
-        print("position is blind left")
-        defaultYaw = -90
-    elif camera_position == 4:
-        print("position is right")
-        defaultYaw = 90
-    elif camera_position == 5:
-        print("position is left")
-        defaultYaw = -90
-    elif camera_position == 6:
-        print("position is rear")
-        defaultYaw = 180
+    # camera_position = int(extrinsic["camera_position"])
+    # if camera_position == 1:
+    #     print("position is 1")
+    #     defaultYaw = 0
+    # elif camera_position == 2:
+    #     print("position is 2")
+    #     defaultYaw = 90
+    # elif camera_position == 3:
+    #     print("position is 3")
+    #     defaultYaw = -90
+    # elif camera_position == 4:
+    #     print("position is 4")
+    #     defaultYaw = 90
+    # elif camera_position == 5:
+    #     print("position is 5")
+    #     defaultYaw = -90
+    # elif camera_position == 6:
+    #     print("position is 6")
+    #     defaultYaw = 180
     rotation = [
         -extrinsic["rotation"]["pitch"],
         extrinsic["rotation"]["roll"],
@@ -543,11 +553,28 @@ def InitSVM(base, imageWidth, imageHeight):
     base.semanticTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
     base.plane.setShaderInput("semanticImgs", base.semanticTexArray)
 
-    print("Texture Initialized!")
+    # print("Texture Initialized!")
 
 
-base_path = "./data/ws_segmenet"
+base_path = "./src/RM_data3"
 camera_positions = ["front", "right", "rear", "left"]
+
+caps = []
+
+for position in camera_positions:
+    cap = cv.VideoCapture(os.path.join(base_path, position + "_cam.webm"))
+    caps.append(cap)
+
+
+semantic_paths = {
+    position: sorted(
+        [f for f in os.listdir(os.path.join(base_path, "labels")) if f.startswith(position + "_")],
+        key=lambda x: int(x.split("_")[1].split(".")[0]),  # Sort files based on the number in filename
+    )
+    for position in camera_positions
+}
+
+num_images = len(semantic_paths["front"])
 
 current_idx = 0
 
@@ -558,17 +585,14 @@ def loadNextImage(task):
     imgs = []
     semantics = []
 
-    for position in camera_positions:
-        # Load image
-        img = cv.imread(os.path.join(base_path, position, "images", image_paths[position][current_idx]))
+    for i, position in enumerate(camera_positions):
+        caps[i].set(cv.CAP_PROP_POS_FRAMES, current_idx)
+        _, img = caps[i].read()
         img = cv.resize(img, (img_width, img_height))
         img = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
         imgs.append(img)
 
-        # Load semantic image
-        semantic = cv.imread(
-            os.path.join(base_path, position, "pseudo_color_prediction", semantic_paths[position][current_idx])
-        )
+        semantic = cv.imread(os.path.join(base_path, "labels", semantic_paths[position][current_idx]))
         semantic = cv.resize(semantic, (img_width, img_height), cv.INTER_NEAREST)
         semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
         semantics.append(semantic)
@@ -592,22 +616,17 @@ def loadDebugImages():
     imgs = []
     semantics = []
 
-    mapProp = []
-
-    for position in camera_positions:
-        # Load debug image
-        img = cv.imread(f"./{position}.png")
+    for i, position in enumerate(camera_positions):
+        caps[i].set(cv.CAP_PROP_POS_FRAMES, current_idx)
+        _, img = caps[i].read()
         img = cv.resize(img, (img_width, img_height))
         img = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
         imgs.append(img)
 
-        # Load debug semantic image
-        semantic = cv.imread(f"./semantic_{position}.png")
+        semantic = cv.imread(os.path.join(base_path, "labels", semantic_paths[position][current_idx]))
         semantic = cv.resize(semantic, (img_width, img_height), cv.INTER_NEAREST)
         semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
         semantics.append(semantic)
-
-        mapProp.append(np.max(semantic))
 
     imgnpArray = np.array(imgs).astype(np.uint8)
     imgArray = imgnpArray.reshape((4, img_width, img_height, 4))
@@ -621,25 +640,15 @@ def loadDebugImages():
 if __name__ == "__main__":
     mySvm = SurroundView()
 
-    if not debug_mode:
-        image_paths = {
-            position: sorted(os.listdir(os.path.join(base_path, position, "images"))) for position in camera_positions
-        }
-        semantic_paths = {
-            position: sorted(os.listdir(os.path.join(base_path, position, "pseudo_color_prediction")))
-            for position in camera_positions
-        }
-        num_images = len(image_paths[camera_positions[0]])
-
     width = mySvm.win.get_x_size()
     height = mySvm.win.get_y_size()
-    print("init w {}, init h {}".format(width, height))
+    # print("init w {}, init h {}".format(width, height))
 
     InitSVM(mySvm, img_width, img_height)
 
     if debug_mode:
         loadDebugImages()
     else:
-        mySvm.taskMgr.add(loadNextImage, "loadNextImageTask", sort=1, uponDeath=exit)
+        mySvm.taskMgr.add(loadNextImage, "LoadNextImageTask")
 
     mySvm.run()
