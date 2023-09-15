@@ -163,7 +163,7 @@ class SurroundView(ShowBase):
         bbox = self.boat.getTightBounds()
         scale_x = boat_length / (bbox[1].x - bbox[0].x)
         scale_y = boat_breadth / (bbox[1].y - bbox[0].y)
-        self.boat.setScale(scale_y, scale_y, scale_x)  # (breath, height, length)
+        self.boat.setScale(scale_y, scale_x, scale_y)  # (breath, length, height)
 
         bbox = self.boat.getTightBounds()
         origin = (bbox[0] + bbox[1]) / 2
