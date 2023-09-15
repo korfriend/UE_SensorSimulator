@@ -157,7 +157,8 @@ class SurroundView(ShowBase):
         self.renderObj.setLight(plnp)
 
         self.boat = self.loader.loadModel("avikus_boat.glb")
-        self.boat.setHpr(90, -90, 180)
+        # self.boat.setHpr(90, -90, 180)
+        self.boat.setHpr(90, 0, 180)
 
         bbox = self.boat.getTightBounds()
         scale_x = boat_length / (bbox[1].x - bbox[0].x)
