@@ -325,18 +325,16 @@ class SurroundView(ShowBase):
                 idx0 = i
                 idx1 = (i + 1) % 4
 
-                camId_values = camId0[overlap_semantic == semantic_value]
+                camId0_values = camId0[((camId0 == idx0) | (camId0 == idx1)) & (overlap_semantic == semantic_value)]
+                camId1_values = camId1[((camId1 == idx0) | (camId1 == idx1)) & (overlap_semantic == semantic_value)]
 
-                if camId_values.size == 0:
+                idx0_count = np.sum(camId0_values == idx0) + np.sum(camId1_values == idx0)
+                idx1_count = np.sum(camId0_values == idx1) + np.sum(camId1_values == idx1)
+
+                if idx0_count + idx1_count == 0:
                     continue
 
-                unique_values, counts = np.unique(camId_values, return_counts=True)
-                ratios = counts / np.sum(counts)
-
-                if ratios[unique_values == idx0].size > 0:
-                    w[i] = ratios[unique_values == idx0][0]
-                elif ratios[unique_values == idx1].size > 0:
-                    w[i] = 1 - ratios[unique_values == idx1][0]
+                w[i] = idx0_count / (idx0_count + idx1_count)
 
         w = np.clip(w, 0.1, 0.9)
 
