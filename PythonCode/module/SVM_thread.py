@@ -708,20 +708,20 @@ def ProcSvmFromPackets(base, numLidars, lidarRes, lidarChs, imageWidth, imageHei
     #     base.pointsVertex.setData3f(posPointWS)
     #     base.pointsColor.setData4f(1, 0, 0, 1)
 
-    depthmaps = []
+    # depthmaps = []
 
-    for i in range(len(imgs)):
-        h, w, _ = imgs[i].shape
-        # depthmap = np.zeros((h, w))
-        # matViewProj = base.matViewProjs[i]
-        # for worldpoint in worldpointlist:
-        #     imagePos = matViewProj.xformPoint(p3d.LPoint3f(worldpoint[0], worldpoint[1], worldpoint[2]))
-        #     imagePos2D = p3d.LPoint2f((imagePos.x + 1.0) * 0.5 * w, (imagePos.y + 1.0) * 0.5 * h)
-        #     if 0 <= imagePos2D.x < w and 0 <= imagePos2D.y < h:
-        #         depthmap[imagePos.y * h][imagePos.x * w] = 255
-        depth_map, sparse_depth = generate_depth_maps((h, w), 0.05)
-        interpolated_depth = poisson_interpolation(sparse_depth, segs[i])
-        depthmaps.append(interpolated_depth)
+    # for i in range(len(imgs)):
+    #     h, w, _ = imgs[i].shape
+    #     depthmap = np.zeros((h, w))
+    #     matViewProj = base.matViewProjs[i]
+    #     for worldpoint in worldpointlist:
+    #         imagePos = matViewProj.xformPoint(p3d.LPoint3f(worldpoint[0], worldpoint[1], worldpoint[2]))
+    #         imagePos2D = p3d.LPoint2f((imagePos.x + 1.0) * 0.5 * w, (imagePos.y + 1.0) * 0.5 * h)
+    #         if 0 <= imagePos2D.x < w and 0 <= imagePos2D.y < h:
+    #             depthmap[imagePos.y * h][imagePos.x * w] = 255
+    #     depth_map, sparse_depth = generate_depth_maps((h, w), 0.05)
+    #     interpolated_depth = poisson_interpolation(sparse_depth, segs[i])
+    #     depthmaps.append(interpolated_depth)
 
     imgnpArray = np.array(imgs).astype(np.uint8)
     imgArray = imgnpArray.reshape((4, imageHeight, imageWidth, 4))
@@ -802,7 +802,7 @@ if __name__ == "__main__":
     # print("init w {}, init h {}".format(width, height))
 
     packetInit = dict()
-    q = queue.Queue(maxsize=10)
+    q = queue.LifoQueue(maxsize=10)
 
     mySvm.qQ = q
     mySvm.packetInit = packetInit

@@ -30,7 +30,7 @@ color_map = [
 ]
 
 
-def ReceiveData(packetInit: dict, q: queue):
+def ReceiveData(packetInit: dict, q: queue.LifoQueue):
     localIP = "127.0.0.1"
     localPort = 12000
     bufferSize = 60000
@@ -87,41 +87,41 @@ def ReceiveData(packetInit: dict, q: queue):
 
             packetInit["isFisheye"] = int.from_bytes(packet[108:112], "little", signed=True)
 
-            print("Num Packets : {}".format(packetInit["packetNum"]))
-            print("Bytes of Points : {}".format(packetInit["bytesPoints"]))
-            print("Bytes of RGB map : {}".format(packetInit["bytesRGBmap"]))
-            print("Bytes of Depth map : {}".format(packetInit["bytesDepthmap"]))
-            print("Num Lidars : {}".format(packetInit["numLidars"]))
-            print("Lidar Resolution : {}".format(packetInit["lidarRes"]))
-            print("Lidar Channels : {}".format(packetInit["lidarChs"]))
-            print("Camera Width : {}".format(packetInit["imageWidth"]))
-            print("Camera Height : {}".format(packetInit["imageHeight"]))
-            print("Camera Fov : {}".format(packetInit["Fov"]))
-            print(
-                "Camera rotate y: {}, {}, {}, {}".format(
-                    packetInit["CameraF_y"], packetInit["CameraR_y"], packetInit["CameraB_y"], packetInit["CameraL_y"]
-                )
-            )
-            print(
-                "CameraF location: {}, {}, {}".format(
-                    packetInit["CameraF_location_x"], packetInit["CameraF_location_y"], packetInit["CameraF_location_z"]
-                )
-            )
-            print(
-                "CameraR location: {}, {}, {}".format(
-                    packetInit["CameraR_location_x"], packetInit["CameraR_location_y"], packetInit["CameraR_location_z"]
-                )
-            )
-            print(
-                "CameraB location: {}, {}, {}".format(
-                    packetInit["CameraB_location_x"], packetInit["CameraB_location_y"], packetInit["CameraB_location_z"]
-                )
-            )
-            print(
-                "CameraL location: {}, {}, {}".format(
-                    packetInit["CameraL_location_x"], packetInit["CameraL_location_y"], packetInit["CameraL_location_z"]
-                )
-            )
+            # print("Num Packets : {}".format(packetInit["packetNum"]))
+            # print("Bytes of Points : {}".format(packetInit["bytesPoints"]))
+            # print("Bytes of RGB map : {}".format(packetInit["bytesRGBmap"]))
+            # print("Bytes of Depth map : {}".format(packetInit["bytesDepthmap"]))
+            # print("Num Lidars : {}".format(packetInit["numLidars"]))
+            # print("Lidar Resolution : {}".format(packetInit["lidarRes"]))
+            # print("Lidar Channels : {}".format(packetInit["lidarChs"]))
+            # print("Camera Width : {}".format(packetInit["imageWidth"]))
+            # print("Camera Height : {}".format(packetInit["imageHeight"]))
+            # print("Camera Fov : {}".format(packetInit["Fov"]))
+            # print(
+            #     "Camera rotate y: {}, {}, {}, {}".format(
+            #         packetInit["CameraF_y"], packetInit["CameraR_y"], packetInit["CameraB_y"], packetInit["CameraL_y"]
+            #     )
+            # )
+            # print(
+            #     "CameraF location: {}, {}, {}".format(
+            #         packetInit["CameraF_location_x"], packetInit["CameraF_location_y"], packetInit["CameraF_location_z"]
+            #     )
+            # )
+            # print(
+            #     "CameraR location: {}, {}, {}".format(
+            #         packetInit["CameraR_location_x"], packetInit["CameraR_location_y"], packetInit["CameraR_location_z"]
+            #     )
+            # )
+            # print(
+            #     "CameraB location: {}, {}, {}".format(
+            #         packetInit["CameraB_location_x"], packetInit["CameraB_location_y"], packetInit["CameraB_location_z"]
+            #     )
+            # )
+            # print(
+            #     "CameraL location: {}, {}, {}".format(
+            #         packetInit["CameraL_location_x"], packetInit["CameraL_location_y"], packetInit["CameraL_location_z"]
+            #     )
+            # )
 
         else:
             if not packetInit:
@@ -188,7 +188,7 @@ def ReceiveData(packetInit: dict, q: queue):
                         dummyByte = dummyByte + imgBytes + imgBytes
 
                     # print("queue size : ", q.qsize())
-                    if q.qsize() > 9:
+                    if q.full():
                         q.get()
                     # print(frame)
                     # print("dic len defor : ", len(packetDict))
@@ -197,7 +197,7 @@ def ReceiveData(packetInit: dict, q: queue):
                     q.put([worldpointList, imgs, segs, segr])
                     del packetDict[key]
                     # print("dic len after : ", len(packetDict))
-                    time.sleep(0.003)
+                    # time.sleep(0.003)
 
                 # else:
                 #     # no full packet
