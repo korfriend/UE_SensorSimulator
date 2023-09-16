@@ -342,9 +342,9 @@ class SurroundView(ShowBase):
                 ratios = counts / np.sum(counts)
 
                 if ratios[unique_values == camId0].size > 0:
-                    w[i] = 1 - ratios[unique_values == i][0]
+                    w[i] = 1 - ratios[unique_values == camId0][0]
                 elif ratios[unique_values == camId1].size > 0:
-                    w[i] = ratios[unique_values == i + 1][0]
+                    w[i] = ratios[unique_values == camId1][0]
 
         w = np.clip(w, 0.1, 0.9)
 
