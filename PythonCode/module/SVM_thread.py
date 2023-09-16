@@ -133,7 +133,7 @@ class SurroundView(ShowBase):
         self.renderObj.setLight(plnp)
 
         self.boat = self.loader.loadModel("avikus_boat.glb")
-        self.boat.setScale(100)
+        self.boat.setScale(150)
         self.boat.set_hpr(0, 90, 90)
         # self.boat.set_hpr(0, 180, 90)
         bbox = self.boat.getTightBounds()
@@ -142,10 +142,10 @@ class SurroundView(ShowBase):
         self.boat.setPos(-center)
         self.boat.reparentTo(self.renderObj)
 
-        self.axis = self.loader.loadModel("zup-axis")
-        self.axis.setPos(0, 0, 0)
-        self.axis.setScale(100)
-        self.axis.reparentTo(self.renderObj)
+        # self.axis = self.loader.loadModel("zup-axis")
+        # self.axis.setPos(0, 0, 0)
+        # self.axis.setScale(100)
+        # self.axis.reparentTo(self.renderObj)
 
         self.isPointCloudSetup = False
         self.lidarRes = 0
@@ -300,9 +300,10 @@ class SurroundView(ShowBase):
         count = np.flip(array0[:, :, 3], 0)
 
         semantic = mapProp // 100
-        camId = mapProp % 100
-        overlapIndex0 = np.where(count > 1, overlapIndex0, 255)
-        overlapIndex1 = np.where(count > 1, overlapIndex1, 255)
+        camId0 = mapProp % 100 // 10
+        camId1 = mapProp % 10
+        overlapIndex0 = np.where(count == 2, overlapIndex0, 255)
+        overlapIndex1 = np.where(count == 2, overlapIndex1, 255)
 
         cam0 = np.where((overlapIndex0 == 0) | (overlapIndex1 == 0), 1, 0)
         cam1 = np.where((overlapIndex0 == 1) | (overlapIndex1 == 1), 1, 0)
@@ -321,10 +322,10 @@ class SurroundView(ShowBase):
         # sets blending weights w based on the highest semantic value
         for semantic_value in range(1, np.max(semantic) + 1):
             for i, overlap_semantic in enumerate(overlap_semantics):
-                camId0 = i
-                camId1 = (i + 1) % 4
+                idx0 = i
+                idx1 = (i + 1) % 4
 
-                camId_values = camId[overlap_semantic == semantic_value]
+                camId_values = camId0[overlap_semantic == semantic_value]
 
                 if camId_values.size == 0:
                     continue
@@ -332,14 +333,12 @@ class SurroundView(ShowBase):
                 unique_values, counts = np.unique(camId_values, return_counts=True)
                 ratios = counts / np.sum(counts)
 
-                if ratios[unique_values == camId0].size > 0:
-                    w[i] = ratios[unique_values == camId0][0]
-                elif ratios[unique_values == camId1].size > 0:
-                    w[i] = 1 - ratios[unique_values == camId1][0]
+                if ratios[unique_values == idx0].size > 0:
+                    w[i] = ratios[unique_values == idx0][0]
+                elif ratios[unique_values == idx1].size > 0:
+                    w[i] = 1 - ratios[unique_values == idx1][0]
 
         w = np.clip(w, 0.1, 0.9)
-
-        print(w)
 
         self.interquad.setShaderInput("w01", w[0])
         self.interquad.setShaderInput("w12", w[1])
@@ -568,11 +567,11 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
 
         base.matViewProjs[imgIdx] = viewProjMat
         # if imgIdx == 1:
-        # print(("camPos1 {}").format(camMat.xformPoint(p3d.Vec3(0, 0, 0))))
-        # print(("camPos2 {}").format(pos))
-        # print(("camDir {}").format(camMat.xform(p3d.Vec3(1, 0, 0))))
-        # print(("camUp  {}").format(camMat.xform(p3d.Vec3(0, 0, 1))))
-        # print("############")
+        #     print(("camPos1 {}").format(camMat.xformPoint(p3d.Vec3(0, 0, 0))))
+        #     print(("camPos2 {}").format(pos))
+        #     print(("camDir {}").format(camMat.xform(p3d.Vec3(1, 0, 0))))
+        #     print(("camUp  {}").format(camMat.xform(p3d.Vec3(0, 0, 1))))
+        #     print("############")
 
         base.plane.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
         # print("plane.setShaderInput")

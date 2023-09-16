@@ -164,7 +164,7 @@ void main()
         // case 4: pos.z += 0; break;
     }
     int overlapIndex[4] = {int(camId0), int(camId1), 0, 0};
-    const int debugMode = 1;
+    const int debugMode = 0;
     switch (count) {
         case 1: {
             if(debugMode == 1) {

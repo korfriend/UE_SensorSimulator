@@ -309,9 +309,10 @@ class SurroundView(ShowBase):
         count = np.flip(array0[:, :, 3], 0)
 
         semantic = mapProp // 100
-        camId = mapProp % 100
-        overlapIndex0 = np.where(count > 1, overlapIndex0, 255)
-        overlapIndex1 = np.where(count > 1, overlapIndex1, 255)
+        camId0 = mapProp % 100 // 10
+        camId1 = mapProp % 10
+        overlapIndex0 = np.where(count == 2, overlapIndex0, 255)
+        overlapIndex1 = np.where(count == 2, overlapIndex1, 255)
 
         cam0 = np.where((overlapIndex0 == 0) | (overlapIndex1 == 0), 1, 0)
         cam1 = np.where((overlapIndex0 == 1) | (overlapIndex1 == 1), 1, 0)
@@ -330,21 +331,19 @@ class SurroundView(ShowBase):
         # sets blending weights w based on the highest semantic value
         for semantic_value in range(1, np.max(semantic) + 1):
             for i, overlap_semantic in enumerate(overlap_semantics):
-                camId0 = i
-                camId1 = (i + 1) % 4
+                idx0 = i
+                idx1 = (i + 1) % 4
 
-                camId_values = camId[overlap_semantic == semantic_value]
+                camId0_values = camId0[((camId0 == idx0) | (camId0 == idx1)) & (overlap_semantic == semantic_value)]
+                camId1_values = camId1[((camId1 == idx0) | (camId1 == idx1)) & (overlap_semantic == semantic_value)]
 
-                if camId_values.size == 0:
+                idx0_count = np.sum(camId0_values == idx0) + np.sum(camId1_values == idx0)
+                idx1_count = np.sum(camId0_values == idx1) + np.sum(camId1_values == idx1)
+
+                if idx0_count + idx1_count == 0:
                     continue
 
-                unique_values, counts = np.unique(camId_values, return_counts=True)
-                ratios = counts / np.sum(counts)
-
-                if ratios[unique_values == camId0].size > 0:
-                    w[i] = 1 - ratios[unique_values == camId0][0]
-                elif ratios[unique_values == camId1].size > 0:
-                    w[i] = ratios[unique_values == camId1][0]
+                w[i] = idx1_count / (idx0_count + idx1_count)
 
         w = np.clip(w, 0.1, 0.9)
 

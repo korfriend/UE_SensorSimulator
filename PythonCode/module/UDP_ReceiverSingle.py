@@ -97,11 +97,31 @@ def ReceiveData(packetInit: dict, q: queue):
             print("Camera Width : {}".format(packetInit["imageWidth"]))
             print("Camera Height : {}".format(packetInit["imageHeight"]))
             print("Camera Fov : {}".format(packetInit["Fov"]))
-            print("Camera rotate y: {}, {}, {}, {}".format(packetInit["CameraF_y"], packetInit["CameraR_y"], packetInit["CameraB_y"], packetInit["CameraL_y"]))
-            print("CameraF location: {}, {}, {}".format(packetInit["CameraF_location_x"], packetInit["CameraF_location_y"], packetInit["CameraF_location_z"]))
-            print("CameraR location: {}, {}, {}".format(packetInit["CameraR_location_x"], packetInit["CameraR_location_y"], packetInit["CameraR_location_z"]))
-            print("CameraB location: {}, {}, {}".format(packetInit["CameraB_location_x"], packetInit["CameraB_location_y"], packetInit["CameraB_location_z"]))
-            print("CameraL location: {}, {}, {}".format(packetInit["CameraL_location_x"], packetInit["CameraL_location_y"], packetInit["CameraL_location_z"]))
+            print(
+                "Camera rotate y: {}, {}, {}, {}".format(
+                    packetInit["CameraF_y"], packetInit["CameraR_y"], packetInit["CameraB_y"], packetInit["CameraL_y"]
+                )
+            )
+            print(
+                "CameraF location: {}, {}, {}".format(
+                    packetInit["CameraF_location_x"], packetInit["CameraF_location_y"], packetInit["CameraF_location_z"]
+                )
+            )
+            print(
+                "CameraR location: {}, {}, {}".format(
+                    packetInit["CameraR_location_x"], packetInit["CameraR_location_y"], packetInit["CameraR_location_z"]
+                )
+            )
+            print(
+                "CameraB location: {}, {}, {}".format(
+                    packetInit["CameraB_location_x"], packetInit["CameraB_location_y"], packetInit["CameraB_location_z"]
+                )
+            )
+            print(
+                "CameraL location: {}, {}, {}".format(
+                    packetInit["CameraL_location_x"], packetInit["CameraL_location_y"], packetInit["CameraL_location_z"]
+                )
+            )
 
         else:
             if not packetInit:
@@ -133,7 +153,9 @@ def ReceiveData(packetInit: dict, q: queue):
                     segr = []
                     offset = 0
 
-                    depthmap = struct.unpack(str(lidarRes * lidarChs) + "f", fullPackets[offset : offset + bytesDepthmap])
+                    depthmap = struct.unpack(
+                        str(lidarRes * lidarChs) + "f", fullPackets[offset : offset + bytesDepthmap]
+                    )
                     depthmapnp = np.array(depthmap, dtype=np.float32)
                     depthmapnp = depthmapnp.reshape((lidarChs, lidarRes))
 
@@ -144,39 +166,14 @@ def ReceiveData(packetInit: dict, q: queue):
                     dummyByte = 0
 
                     for _ in range(4):
-                        imgnp = np.array(fullPackets[offsetImg + dummyByte : offsetImg + dummyByte + imgBytes], dtype=np.uint8)
-                        segnp = np.array(fullPackets[offsetImg + dummyByte + imgBytes : offsetImg + dummyByte + imgBytes + imgBytes], dtype=np.uint8)
+                        imgnp = np.array(
+                            fullPackets[offsetImg + dummyByte : offsetImg + dummyByte + imgBytes], dtype=np.uint8
+                        )
+                        segnp = np.array(
+                            fullPackets[offsetImg + dummyByte + imgBytes : offsetImg + dummyByte + imgBytes + imgBytes],
+                            dtype=np.uint8,
+                        )
                         imgnp = imgnp.reshape((imageHeight, imageWidth, 4))
-
-                        # if isFisheye == 1:
-                        #     fx = imageWidth / math.tan(0.5 * fov) * 2
-                        #     fy = imageHeight / math.tan(0.5 * fov) * 2
-                        #     cx = imageWidth / 2
-                        #     cy = imageHeight / 2
-
-                        #     K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
-
-                        #     K1 = 0.0
-                        #     K2 = 0.0
-                        #     K3 = 0.0
-                        #     K4 = 0.0
-                        #     K5 = 0.0
-
-                        #     D = np.array([K2, K3, K4, K5])
-                        #     if K1 != 0:
-                        #         D /= K1
-
-                        #     # undistorted = cv.fisheye.undistortImage(distorted, K, D)
-                        #     P = cv.fisheye.estimateNewCameraMatrixForUndistortRectify(
-                        #         K, D, (imageWidth, imageHeight), np.eye(3), balance=1.0
-                        #     )
-                        #     map1, map2 = cv.fisheye.initUndistortRectifyMap(
-                        #         K, D, np.eye(3), P, (imageWidth, imageHeight), cv.CV_16SC2
-                        #     )
-                        #     imgnp = cv.remap(
-                        #         imgnp, map1, map2, interpolation=cv.INTER_LINEAR, borderMode=cv.BORDER_CONSTANT
-                        #     )
-
                         segnp = segnp.reshape((imageHeight, imageWidth, 4))
                         imgs.append(imgnp)
 
