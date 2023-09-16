@@ -1,11 +1,14 @@
 import queue
 import socket
 import struct
-import time
 
 import cv2 as cv
-import DepthToPoint
 import numpy as np
+
+import DepthToPoint
+
+# import time
+
 
 color_map = [
     (128, 64, 128),
@@ -30,7 +33,7 @@ color_map = [
 ]
 
 
-def ReceiveData(packetInit: dict, q: queue.LifoQueue):
+def ReceiveData(packetInit: dict, q: queue.Queue):
     localIP = "127.0.0.1"
     localPort = 12000
     bufferSize = 60000

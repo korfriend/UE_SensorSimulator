@@ -802,7 +802,7 @@ if __name__ == "__main__":
     # print("init w {}, init h {}".format(width, height))
 
     packetInit = dict()
-    q = queue.LifoQueue(maxsize=10)
+    q = queue.Queue(maxsize=1)
 
     mySvm.qQ = q
     mySvm.packetInit = packetInit
