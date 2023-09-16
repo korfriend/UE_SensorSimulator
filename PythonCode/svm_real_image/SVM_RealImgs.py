@@ -48,7 +48,7 @@ class SurroundView(ShowBase):
         super().__init__()
 
         winprops = p3d.WindowProperties()
-        winprops.setSize(winSizeX, winSizeX)
+        winprops.setSize(winSizeX, winSizeY)
         self.win.requestProperties(winprops)
 
         self.render.setAntialias(p3d.AntialiasAttrib.MAuto)
@@ -200,77 +200,51 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w23", 0.5)
         self.interquad.setShaderInput("w30", 0.5)
 
-        def GeneratePlaneNode(svmBase):
-            # shader setting for SVM
-            svmBase.planeShader = Shader.load(
-                Shader.SL_GLSL, vertex="glsl/svm_vs.glsl", fragment="glsl/svm_ps_plane_real.glsl"
-            )
-            vdata = p3d.GeomVertexData("triangle_data", p3d.GeomVertexFormat.getV3t2(), p3d.Geom.UHStatic)
-            vdata.setNumRows(4)  # optional for performance enhancement!
-            vertex = p3d.GeomVertexWriter(vdata, "vertex")
-            texcoord = p3d.GeomVertexWriter(vdata, "texcoord")
-
-            bbox = svmBase.boat.getTightBounds()
-            # print(bbox)
-            self.waterZ = 0
-            waterPlaneLength = 1000
-            vertex.addData3(-waterPlaneLength, -waterPlaneLength, self.waterZ)
-            vertex.addData3(waterPlaneLength, -waterPlaneLength, self.waterZ)
-            vertex.addData3(waterPlaneLength, waterPlaneLength, self.waterZ)
-            vertex.addData3(-waterPlaneLength, waterPlaneLength, self.waterZ)
-            # not use...
-            texcoord.addData2(0, 1)
-            texcoord.addData2(1, 1)
-            texcoord.addData2(1, 0)
-            texcoord.addData2(0, 0)
-
-            primTris = p3d.GeomTriangles(p3d.Geom.UHStatic)
-            primTris.addVertices(0, 1, 2)
-            primTris.addVertices(0, 2, 3)
-
-            geom = p3d.Geom(vdata)
-            geom.addPrimitive(primTris)
-            geomNode = p3d.GeomNode("SVM Plane")
-            geomNode.addGeom(geom)
-            # note nodePath is the instance for node (obj resource)
-            svmBase.plane = p3d.NodePath(geomNode)
-            svmBase.plane.setTwoSided(True)
-            svmBase.plane.setShader(svmBase.planeShader)
-
-            # the following mat4 array does not work...
-            # matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
-            # svmBase.plane.setShaderInput("matViewProjs", matViewProjs)
-
-            # svmBase.planeTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
-            for i in range(4):
-                svmBase.plane.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-                svmBase.interquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-                svmBase.finalquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-
-            svmBase.planeTexArray = p3d.Texture()
-            svmBase.planeTexArray.setup2dTextureArray(
-                img_width, img_height, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
-            )
-            svmBase.plane.setShaderInput("cameraImgs", svmBase.planeTexArray)
-            svmBase.interquad.setShaderInput("cameraImgs", svmBase.planeTexArray)
-            # svmBase.finalquad.setShaderInput("cameraImgs", svmBase.planeTexArray)
-
-            svmBase.camPositions = [p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f()]
-            svmBase.plane.setShaderInput("camPositions", svmBase.camPositions)
-
-            # initial setting like the above code! (for resource optimization)
-            # svmBase.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
-            svmBase.semanticTexArray = p3d.Texture()
-            svmBase.semanticTexArray.setup2dTextureArray(
-                img_width, img_height, 4, p3d.Texture.T_int, p3d.Texture.F_r32i
-            )
-            # print(img_width, img_height)
-            svmBase.plane.setShaderInput("semanticImgs", svmBase.semanticTexArray)
-            svmBase.interquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
-            svmBase.finalquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
-
-        GeneratePlaneNode(self)
+        self.GeneratePlaneNode()
         self.plane.reparentTo(self.renderSVM)
+
+        self.plane.setShaderInput("K1_", K1)
+        self.plane.setShaderInput("K2_", K2)
+        self.plane.setShaderInput("K3_", K3)
+        self.plane.setShaderInput("K4_", K4)
+        self.plane.setShaderInput("K5_", K5)
+
+        self.plane.setShaderInput("img_width_", img_width)
+        self.plane.setShaderInput("img_height_", img_height)
+
+        self.plane.setShaderInput("fx_", fx)
+        self.plane.setShaderInput("fy_", fy)
+        self.plane.setShaderInput("cx_", cx)
+        self.plane.setShaderInput("cy_", cy)
+
+        self.interquad.setShaderInput("K1_", K1)
+        self.interquad.setShaderInput("K2_", K2)
+        self.interquad.setShaderInput("K3_", K3)
+        self.interquad.setShaderInput("K4_", K4)
+        self.interquad.setShaderInput("K5_", K5)
+
+        self.interquad.setShaderInput("img_width_", img_width)
+        self.interquad.setShaderInput("img_height_", img_height)
+
+        self.interquad.setShaderInput("fx_", fx)
+        self.interquad.setShaderInput("fy_", fy)
+        self.interquad.setShaderInput("cx_", cx)
+        self.interquad.setShaderInput("cy_", cy)
+
+        self.finalquad.setShaderInput("K1_", K1)
+        self.finalquad.setShaderInput("K2_", K2)
+        self.finalquad.setShaderInput("K3_", K3)
+        self.finalquad.setShaderInput("K4_", K4)
+        self.finalquad.setShaderInput("K5_", K5)
+
+        self.finalquad.setShaderInput("img_width_", img_width)
+        self.finalquad.setShaderInput("img_height_", img_height)
+
+        self.finalquad.setShaderInput("fx_", fx)
+        self.finalquad.setShaderInput("fy_", fy)
+        self.finalquad.setShaderInput("cx_", cx)
+        self.finalquad.setShaderInput("cy_", cy)
+
         self.accept("r", self.shaderRecompile)
 
         self.bufferViewer.setPosition("llcorner")
@@ -280,6 +254,73 @@ class SurroundView(ShowBase):
         self.taskMgr.add(self.readTextureData, "readTextureData")
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
+
+    def GeneratePlaneNode(self):
+        # shader setting for SVM
+        self.planeShader = Shader.load(
+            Shader.SL_GLSL, vertex="glsl/svm_vs.glsl", fragment="glsl/svm_ps_plane_real.glsl"
+        )
+        vdata = p3d.GeomVertexData("triangle_data", p3d.GeomVertexFormat.getV3t2(), p3d.Geom.UHStatic)
+        vdata.setNumRows(4)  # optional for performance enhancement!
+        vertex = p3d.GeomVertexWriter(vdata, "vertex")
+        texcoord = p3d.GeomVertexWriter(vdata, "texcoord")
+
+        bbox = self.boat.getTightBounds()
+        # print(bbox)
+        self.waterZ = 0
+        waterPlaneLength = 1000
+        vertex.addData3(-waterPlaneLength, -waterPlaneLength, self.waterZ)
+        vertex.addData3(waterPlaneLength, -waterPlaneLength, self.waterZ)
+        vertex.addData3(waterPlaneLength, waterPlaneLength, self.waterZ)
+        vertex.addData3(-waterPlaneLength, waterPlaneLength, self.waterZ)
+        # not use...
+        texcoord.addData2(0, 1)
+        texcoord.addData2(1, 1)
+        texcoord.addData2(1, 0)
+        texcoord.addData2(0, 0)
+
+        primTris = p3d.GeomTriangles(p3d.Geom.UHStatic)
+        primTris.addVertices(0, 1, 2)
+        primTris.addVertices(0, 2, 3)
+
+        geom = p3d.Geom(vdata)
+        geom.addPrimitive(primTris)
+        geomNode = p3d.GeomNode("SVM Plane")
+        geomNode.addGeom(geom)
+        # note nodePath is the instance for node (obj resource)
+        self.plane = p3d.NodePath(geomNode)
+        self.plane.setTwoSided(True)
+        self.plane.setShader(self.planeShader)
+
+        # the following mat4 array does not work...
+        # matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
+        # self.plane.setShaderInput("matViewProjs", matViewProjs)
+
+        # self.planeTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
+        for i in range(4):
+            self.plane.setShaderInput("matViewProj" + str(i), p3d.Mat4())
+            self.interquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
+            self.finalquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
+
+        self.planeTexArray = p3d.Texture()
+        self.planeTexArray.setup2dTextureArray(
+            img_width, img_height, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
+        )
+        self.plane.setShaderInput("cameraImgs", self.planeTexArray)
+        self.interquad.setShaderInput("cameraImgs", self.planeTexArray)
+        # self.finalquad.setShaderInput("cameraImgs", self.planeTexArray)
+
+        self.camPositions = [p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f()]
+        self.plane.setShaderInput("camPositions", self.camPositions)
+
+        # initial setting like the above code! (for resource optimization)
+        # self.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
+        self.semanticTexArray = p3d.Texture()
+        self.semanticTexArray.setup2dTextureArray(img_width, img_height, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
+        # print(img_width, img_height)
+        self.plane.setShaderInput("semanticImgs", self.semanticTexArray)
+        self.interquad.setShaderInput("semanticImgs", self.semanticTexArray)
+        self.finalquad.setShaderInput("semanticImgs", self.semanticTexArray)
 
     def readTextureData(self, task):
         self.buffer1.set_active(True)

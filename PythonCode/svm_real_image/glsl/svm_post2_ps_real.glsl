@@ -19,19 +19,19 @@ uniform isampler2DArray semanticImgs;
 
 uniform sampler2D tex;
 
-const float K1_ = 1.281584985127447;
-const float K2_ = 0.170043067138006;
-const float K3_ = -0.023341058557079;
-const float K4_ = 0.007690791651144;
-const float K5_ = -0.001380968639013;
+uniform float K1_ = 1.281584985127447;
+uniform float K2_ = 0.170043067138006;
+uniform float K3_ = -0.023341058557079;
+uniform float K4_ = 0.007690791651144;
+uniform float K5_ = -0.001380968639013;
 
-const float img_width_ = 1920;
-const float img_height_ = 1080;
+uniform float img_width_ = 1920;
+uniform float img_height_ = 1080;
 
-const float fx_ = 345.12136354806347;
-const float fy_ = 346.09009197978003;
-const float cx_ = 959.5;// - img_width_ / 2;
-const float cy_ = 539.5;// - img_height_ / 2;
+uniform float fx_ = 345.12136354806347;
+uniform float fy_ = 346.09009197978003;
+uniform float cx_ = 959.5;// - img_width_ / 2;
+uniform float cy_ = 539.5;// - img_height_ / 2;
 
 
 vec2 distortPoint(vec2 Array_uv)
