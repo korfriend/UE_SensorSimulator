@@ -134,8 +134,8 @@ class SurroundView(ShowBase):
 
         self.boat = self.loader.loadModel("avikus_boat.glb")
         self.boat.setScale(150)
-        self.boat.set_hpr(0, 90, 90)
-        # self.boat.set_hpr(0, 180, 90)
+        # self.boat.set_hpr(90, -90, 0)
+        self.boat.set_hpr(90, 0, 0)
         bbox = self.boat.getTightBounds()
         # print("boat bound : ", bbox)
         center = (bbox[0] + bbox[1]) * 0.5
