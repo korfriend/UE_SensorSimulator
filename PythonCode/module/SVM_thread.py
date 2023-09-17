@@ -272,6 +272,12 @@ class SurroundView(ShowBase):
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
 
+        self.isPointCloudVisible = True
+        self.accept("p", self.toggle_point_cloud_visibility)
+
+    def toggle_point_cloud_visibility(self):
+        self.isPointCloudVisible = not self.isPointCloudVisible
+
     def readTextureData(self, task):
         self.buffer1.set_active(True)
         self.buffer2.set_active(True)
@@ -671,40 +677,33 @@ def ProcSvmFromPackets(base, numLidars, lidarRes, lidarChs, imageWidth, imageHei
         solution = spsolve(A.tocsr(), b)
         return solution.reshape(rows, cols)
 
-    maxNumPoints = base.lidarRes * base.lidarChs * base.numLidars
+    if base.isPointCloudSetup:
+        maxNumPoints = base.lidarRes * base.lidarChs * base.numLidars
 
-    base.pointsVertex.setRow(0)
-    base.pointsColor.setRow(0)
-    for i in range(maxNumPoints):
-        if i < len(worldpointlist):
-            base.pointsVertex.setData3f(worldpointlist[i][0], worldpointlist[i][1], worldpointlist[i][2])
-            base.pointsColor.setData4f(1, 0, 0, 1)
+        base.pointsVertex.setRow(0)
+        base.pointsColor.setRow(0)
+
+        if base.isPointCloudVisible:
+            for i in range(maxNumPoints):
+                if i < len(worldpointlist):
+                    x, y, z = worldpointlist[i]
+                    base.pointsVertex.setData3f(x, y, z)
+                    base.pointsColor.setData4f(1, 1, 0, 1)  # Setting the color to yellow
+                else:
+                    base.pointsVertex.setData3f(10000, 10000, 10000)
+                    base.pointsColor.setData4f(0, 0, 0, 0)
         else:
-            base.pointsVertex.setData3f(0, 0, 0)
-            base.pointsColor.setData4f(0, 0, 0, 0)
+            for i in range(maxNumPoints):
+                base.pointsVertex.setData3f(10000, 10000, 10000)
+                base.pointsColor.setData4f(0, 0, 0, 0)
 
-    # depthmaps = []
+        imgnpArray = np.array(imgs).astype(np.uint8)
+        imgArray = imgnpArray.reshape((4, imageHeight, imageWidth, 4))
+        cameraArray = imgArray[:, :, :, :].copy()
+        semanticArray = np.array(segs).astype(np.uint32)
 
-    # for i in range(len(imgs)):
-    #     h, w, _ = imgs[i].shape
-    #     depthmap = np.zeros((h, w))
-    #     matViewProj = base.matViewProjs[i]
-    #     for worldpoint in worldpointlist:
-    #         imagePos = matViewProj.xformPoint(p3d.LPoint3f(worldpoint[0], worldpoint[1], worldpoint[2]))
-    #         imagePos2D = p3d.LPoint2f((imagePos.x + 1.0) * 0.5 * w, (imagePos.y + 1.0) * 0.5 * h)
-    #         if 0 <= imagePos2D.x < w and 0 <= imagePos2D.y < h:
-    #             depthmap[imagePos.y * h][imagePos.x * w] = 255
-    #     depth_map, sparse_depth = generate_depth_maps((h, w), 0.05)
-    #     interpolated_depth = poisson_interpolation(sparse_depth, segs[i])
-    #     depthmaps.append(interpolated_depth)
-
-    imgnpArray = np.array(imgs).astype(np.uint8)
-    imgArray = imgnpArray.reshape((4, imageHeight, imageWidth, 4))
-    cameraArray = imgArray[:, :, :, :].copy()
-    semanticArray = np.array(segs).astype(np.uint32)
-
-    base.planeTexArray.setRamImage(cameraArray)
-    base.semanticTexArray.setRamImage(semanticArray)
+        base.planeTexArray.setRamImage(cameraArray)
+        base.semanticTexArray.setRamImage(semanticArray)
 
 
 def PacketProcessing(packetInit: dict, q: queue):
