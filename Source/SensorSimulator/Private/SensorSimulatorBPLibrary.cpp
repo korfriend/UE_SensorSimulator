@@ -359,7 +359,8 @@ auto LidarScan360 = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarP
 					sensorOut360.lidarPointsOut360.Add(pcPoint);
 				}*/
 
-				sensorOut360.depthArrayOut360[x + chIdx * lidarResolution] = FVector::Dist(posChannelStart, FVector(hitPosition));
+				//sensorOut360.depthArrayOut360[x + chIdx * lidarResolution] = FVector::Dist(posChannelStart, FVector(hitPosition));
+				sensorOut360.depthArrayOut360[x + chIdx * lidarResolution] = outHit.Distance;
 			}
 		}
 	}

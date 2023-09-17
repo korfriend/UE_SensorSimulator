@@ -1,46 +1,38 @@
 import numpy as np
 
 
-def toPoints(channel: int, res: int, vfov: float, hfov: float, depthmap: np.array):
-    # Compute deltas
-    delta_deg = hfov / res
-    v_rot_delta = vfov / channel
+def toPoints(channel, res, vfov, hfov, depthmap, origin=(0, 0, 0)):
+    # Initialize an empty list to store the 3D points
+    points = []
 
-    results = []
+    # Calculate the angular increments in horizontal and vertical directions
+    delta_hfov = hfov / res
+    delta_vfov = vfov / (channel - 1)
 
-    for ch_idx in range(channel):
-        v_rot_deg = -vfov / 2 + ch_idx * v_rot_delta
+    # Iterate through each channel and each point in the resolution
+    for ch in range(channel):
+        v_angle = -vfov / 2 + ch * delta_vfov
+        for r in range(res):
+            h_angle = -hfov / 2 + r * delta_hfov
 
-        for x in range(res):
-            # Determine the depth from the depthmap
-            depth = depthmap[ch_idx, x]
+            # Get the depth value from the depth map
+            depth = depthmap[ch * res + r]
 
-            # Check if depth is less than 0, if so, skip the current iteration
-            if depth < 0:
-                continue
+            if depth >= 0:  # Only consider valid depth values
+                # Calculate the 3D coordinates of the point in the sensor's local coordinate system
+                x = depth * np.cos(np.radians(v_angle)) * np.cos(np.radians(h_angle))
+                y = depth * np.cos(np.radians(v_angle)) * np.sin(np.radians(h_angle))
+                z = depth * np.sin(np.radians(v_angle))
 
-            rot_deg = delta_deg * x - hfov / 2
+                # Transform the coordinates to the global coordinate system using the origin
+                x += origin[0]
+                y += origin[1]
+                z += origin[2]
 
-            # Calculating the direction vector components using trigonometric functions
-            dir_x_ue = np.cos(np.radians(v_rot_deg)) * np.cos(np.radians(rot_deg))
-            dir_y_ue = np.cos(np.radians(v_rot_deg)) * np.sin(np.radians(rot_deg))
-            dir_z_ue = np.sin(np.radians(v_rot_deg))
+                # Append the point to the list of points
+                points.append([x, -y, z])
 
-            # Convert from Unreal Engine coordinates to Panda3D coordinates
-            dir_x_pd = dir_y_ue
-            dir_y_pd = dir_x_ue
-            dir_z_pd = dir_z_ue
+    # Convert the list of points to a numpy array
+    points = np.array(points)
 
-            # Rotate around the z-axis by 90 degrees (counter-clockwise)
-            theta = np.radians(-90)
-            rotated_x = dir_x_pd * np.cos(theta) - dir_y_pd * np.sin(theta)
-            rotated_y = dir_x_pd * np.sin(theta) + dir_y_pd * np.cos(theta)
-
-            # Calculate the hit position based on the direction and depth
-            hit_position_x = rotated_x * depth
-            hit_position_y = rotated_y * depth
-            hit_position_z = dir_z_pd * depth
-
-            results.append((hit_position_x, hit_position_y, hit_position_z, depth))
-
-    return results
+    return points
