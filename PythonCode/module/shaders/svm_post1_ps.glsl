@@ -19,18 +19,23 @@ uniform sampler2D texGeoInfo2; // from sceneObj
 uniform sampler2DArray cameraImgs;
 uniform isampler2DArray semanticImgs;
 
+uniform float w01;
+uniform float w12;
+uniform float w23;
+uniform float w30;
+
 uniform int img_w;
 uniform int img_h;
 
-vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, float weightId0, int semantic, int debugMode) {
+vec4 blendArea(int camId0, int camId1, vec3 pos, vec3 pos_original, mat4 viewProjs[4], int caseId, float weightId0, int debugMode) {
     const float bias0 = weightId0;//1.0;
     const float bias1 = 1.0 - weightId0;//1.0;
 
-    vec4 imagePos = viewProjs[camId0] * vec4(pos, 1.0);
+    vec4 imagePos = viewProjs[camId0] * vec4(pos_original, 1.0);
     vec2 imagePos2D = imagePos.xy / imagePos.w;
     vec2 texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
 
-    imagePos = viewProjs[camId1] * vec4(pos, 1.0);
+    imagePos = viewProjs[camId1] * vec4(pos_original, 1.0);
     imagePos2D = imagePos.xy / imagePos.w;
     vec2 texPos1 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
 
@@ -40,7 +45,7 @@ vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, 
     float v1 = texPos1.y;
 
     float w0 = u0, w1 = u1;
-    if (u0 > v0 && u1 > v1) 
+    if (false)//(u0 > v0 && u1 > v1) 
     {
         w0 = v0;// + u0;
         w1 = v1;// + u1;
@@ -71,24 +76,32 @@ vec4 blendArea(int camId0, int camId1, vec3 pos, mat4 viewProjs[4], int caseId, 
         }
     }
     else {
+                
+        imagePos = viewProjs[camId0] * vec4(pos, 1.0);
+        imagePos2D = imagePos.xy / imagePos.w;
+        texPos0 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+
+        imagePos = viewProjs[camId1] * vec4(pos, 1.0);
+        imagePos2D = imagePos.xy / imagePos.w;
+        texPos1 = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+
+        vec4 img1 = texture(cameraImgs, vec3(1 - texPos0.x, 1 - texPos0.y, camId0));
+        vec4 img2 = texture(cameraImgs, vec3(1 - texPos1.x, 1 - texPos1.y, camId1));
+
         ivec2 texIdx2d0 = ivec2((1 - texPos0.x) * img_w + 0.5, (1 - texPos0.y) * img_h + 0.5);
         int semantic0 = texelFetch(semanticImgs, ivec3(texIdx2d0, camId0), 0).r;
         ivec2 texIdx2d1 = ivec2((1 - texPos1.x) * img_w + 0.5, (1 - texPos1.y) * img_h + 0.5);
         int semantic1 = texelFetch(semanticImgs, ivec3(texIdx2d1, camId1), 0).r;
-
-        vec4 img1 = texture(cameraImgs, vec3(1 - texPos0.x, 1 - texPos0.y, camId0));
-        vec4 img2 = texture(cameraImgs, vec3(1 - texPos1.x, 1 - texPos1.y, camId1));
-        
-        if(semantic0 != semantic) img1 = vec4(0, 0, 0, 1);
-        if(semantic1 != semantic) img2 = vec4(0, 0, 0, 1);
-        
-        colorOut = w0 * img1 + w1 * img2;
-
-        //if(pos.z == 100.0) {
-        //    if(semantic0 != 3 && semantic1 != 3) {
-        //        colorOut = vec4(0, 0, 0, 1);
-        //    }
-        //}
+        if(pos.z != 0.0
+            && semantic0 != 1 
+            && semantic1 != 1
+            && semantic0 != 2
+            && semantic1 != 2) {
+            colorOut = vec4(0, 0, 0, 1);
+        }
+        else {
+            colorOut = w0 * img1 + w1 * img2;
+        }
 
         //colorOut.rgb *= 255.0;
         //colorOut.r = (int(colorOut.r + 2.9)) / 255.0;
@@ -121,12 +134,12 @@ void main()
 #ifdef MYDEBUG__ 
     
     if (count > 0) {
-        switch(semantic) {
+        switch(semantic / 100) {
             case 1 : colorOut.bgra = vec4(130.0/255.0, 120.0/255.0, 110.0/255.0, 1); break;
             case 2 : colorOut.bgra = vec4(255.0/255.0, 35.0/255.0, 35.0/255.0, 1); break;
-            case 3 : colorOut.bgra = vec4( 35.0/255.0, 255.0/255.0, 35.0/255.0, 1); break;
-            case 4 : colorOut.bgra = vec4(35.0/255.0,35.0/255.0,255.0/255.0, 1); break;
-            case 0 : colorOut = vec4(1, 1, 0, 1); break;
+            // case 3 : colorOut.bgra = vec4( 35.0/255.0, 255.0/255.0, 35.0/255.0, 1); break;
+            // case 4 : colorOut.bgra = vec4(35.0/255.0,35.0/255.0,255.0/255.0, 1); break;
+            // case 0 : colorOut = vec4(1, 1, 0, 1); break;
             default : colorOut = vec4(0, 0, 0, 1); break;
         }
     }
@@ -141,11 +154,12 @@ void main()
     //colorOut = vec4(camId0, camId1, 0, 1);
 #else
     
-    pos.z = 0;
+    // pos.z = 0;
     // height correction
-    switch (semantic) {
+    vec3 pos_original = pos;
+    switch (semantic / 100) {
         case 1: pos.z = 60; break;
-        // case 2: pos.z += 0; break;
+        case 2: pos.z = 60; break;
         // case 3: pos.z += 0; break;
         // case 4: pos.z += 0; break;
     }
@@ -170,9 +184,13 @@ void main()
 
                 ivec2 texIdx2d0 = ivec2((1 - texPos0.x) * img_w + 0.5, (1 - texPos0.y) * img_h + 0.5);
                 int semantic0 = texelFetch(semanticImgs, ivec3(texIdx2d0, camId), 0).r;
-                if(semantic0 != semantic) img0 = vec4(0, 0, 0, 1);
-
-                colorOut = img0;
+                if(pos.z != 0.0
+                    && semantic0 != 1
+                    && semantic0 != 2) {
+                    colorOut = vec4(0, 0, 0, 1);
+                }
+                else 
+                    colorOut = texture(cameraImgs, vec3((1 - texPos0.x), (1 - texPos0.y), camId));
             }
             break;
         }
@@ -182,25 +200,25 @@ void main()
             int enc = idx0 * 2 + idx1;
 
             // TO DO : determine dynamic blending weights
-            float w01 = 0.5;
-            float w12 = 0.5;
-            float w23 = 0.5;
-            float w30 = 0.5;
+            // float w01 = 0.5;
+            // float w12 = 0.5;
+            // float w23 = 0.5;
+            // float w30 = 0.5;
             switch(enc) {
                 case 1: {
-                    colorOut = blendArea(0, 1, pos, viewProjs, enc, w01, semantic, debugMode);
+                    colorOut = blendArea(0, 1, pos, pos_original, viewProjs, enc, w01, debugMode);
                     break;
                 }
                 case 4: {
-                    colorOut = blendArea(1, 2, pos, viewProjs, enc, w12, semantic, debugMode);
+                    colorOut = blendArea(1, 2, pos, pos_original, viewProjs, enc, w12, debugMode);
                     break;
                 }
                 case 7: {
-                    colorOut = blendArea(2, 3, pos, viewProjs, enc, w23, semantic, debugMode);
+                    colorOut = blendArea(2, 3, pos, pos_original, viewProjs, enc, w23, debugMode);
                     break;
                 }
                 case 3: {
-                    colorOut = blendArea(3, 0, pos, viewProjs, enc, w30, semantic, debugMode);
+                    colorOut = blendArea(3, 0, pos, pos_original, viewProjs, enc, w30, debugMode);
                     break;
                 }
             }

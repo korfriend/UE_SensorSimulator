@@ -31,9 +31,6 @@ uniform int img_h;
 void main() {
     vec3 pos = worldcoord;
     mat4 viewProjs[4] = {matViewProj0, matViewProj1, matViewProj2, matViewProj3};
-    pos.z = 0;
-    
-    
     int count = 0;
     int mapProp = 0;    // 0 : undef, 1 : ground, 2 : target geometry
     int overlapIndex[4] = {-1, -1, -1, -1};
@@ -50,8 +47,9 @@ void main() {
                 
                 const ivec2 texIdx2d = ivec2((1 - texPos.x) * img_w + 0.5, (1 - texPos.y) * img_h + 0.5);
                 int semantic = texelFetch(semanticImgs, ivec3(texIdx2d, i), 0).r;
-                //if(semantic == 0) semantic = 1;
-                if (semantic > mapProp) mapProp = semantic;
+                if(semantic == 0) continue;
+                if (semantic > mapProp / 100) mapProp = semantic * 100 + i * 10 + 7;
+                else if (semantic == mapProp / 100) mapProp = mapProp / 10 * 10 + 1;
         }
     }
 

@@ -229,7 +229,7 @@ auto LidarScan360 = [](const TArray<FLidarPointCloudPoint>& lidarPoints, ULidarP
 		sensorOut360.colorArrayOutL.Init(FColor(), texWidth* texHeight);
 		sensorOut360.colorArrayOutB.Init(FColor(), texWidth* texHeight);
 		sensorOut360.colorArrayOutR.Init(FColor(), texWidth* texHeight);
-		GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, FString::Printf(TEXT("created")));
+		//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, FString::Printf(TEXT("created")));
 	}
 
 
@@ -608,7 +608,7 @@ void USensorSimulatorBPLibrary::SensorOutToBytes360(const FLidarSensorOut360 & l
 	//bytePackets.ArrayOut.Reset();
 	if (bytePackets.FArrayOut.Num() == 0) {
 		bytePackets.FArrayOut.Init(FBytes(), numPackets);
-		GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::Printf(TEXT("created")));
+		//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::Printf(TEXT("created")));
 	}
 
 	//GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Blue, FString::Printf(TEXT("created")));

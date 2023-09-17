@@ -9,17 +9,15 @@ from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Shader
 
-debug_mode = True  # Set this variable to True or False to enable or disable debug mode
+debug_mode = False  # Set this variable to True or False to enable or disable debug mode
 
-calibration_filepath = "./Calibration_Simul_Debug.json" if debug_mode else "./Calibration_Simul.json"
+with open("./config_raymarine.json") as f:
+    calib = json.load(f)
 
-with open(calibration_filepath) as f:
-    calibration = json.load(f)
+boat_breadth = calib["boat_type"]["custom_breadth"] * 100
+boat_length = calib["boat_type"]["custom_length"] * 100
 
-boat_breadth = calibration["boat_type"]["custom_breadth"] * 100
-boat_length = calibration["boat_type"]["custom_length"] * 100
-
-extrinsic_parameter = calibration["extrinsic_parameter"]["cameras"]
+extrinsic_parameter = calib["extrinsic_parameter"]["cameras"]
 del extrinsic_parameter[1:3]
 extrinsic_parameter[2], extrinsic_parameter[3] = extrinsic_parameter[3], extrinsic_parameter[2]
 for extrinsic in extrinsic_parameter:
@@ -50,7 +48,7 @@ class SurroundView(ShowBase):
         super().__init__()
 
         winprops = p3d.WindowProperties()
-        winprops.setSize(winSizeX, winSizeX)
+        winprops.setSize(winSizeX, winSizeY)
         self.win.requestProperties(winprops)
 
         self.render.setAntialias(p3d.AntialiasAttrib.MAuto)
@@ -156,14 +154,14 @@ class SurroundView(ShowBase):
         plnp.setPos(0, 0, -4000)
         self.renderObj.setLight(plnp)
 
-        self.boat = self.loader.loadModel("avikus_boat.glb")
+        self.boat = self.loader.loadModel("./src/avikus_boat.glb")
         # self.boat.setHpr(90, -90, 180)
         self.boat.setHpr(90, 0, 180)
 
         bbox = self.boat.getTightBounds()
         scale_x = boat_length / (bbox[1].x - bbox[0].x)
         scale_y = boat_breadth / (bbox[1].y - bbox[0].y)
-        self.boat.setScale(scale_y, scale_y, scale_x)  # (breath, height, length)
+        self.boat.setScale(scale_y, scale_x, scale_y)  # (breath, length, height)
 
         bbox = self.boat.getTightBounds()
         origin = (bbox[0] + bbox[1]) / 2
@@ -183,8 +181,12 @@ class SurroundView(ShowBase):
         self.manager.buffers[1].addRenderTexture(
             tex, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color
         )
-        self.interquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps_real.glsl"))
-        self.finalquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post2_ps_real.glsl"))
+        self.interquad.setShader(
+            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post1_ps_real.glsl")
+        )
+        self.finalquad.setShader(
+            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post2_ps_real.glsl")
+        )
         self.finalquad.setShaderInput("tex", self.manager.buffers[1].getTexture(0))
         self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
@@ -193,85 +195,56 @@ class SurroundView(ShowBase):
         self.finalquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.finalquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
 
-        self.w01 = 0.5
-        self.w12 = 0.5
-        self.w23 = 0.5
-        self.w30 = 0.5
+        self.interquad.setShaderInput("w01", 0.5)
+        self.interquad.setShaderInput("w12", 0.5)
+        self.interquad.setShaderInput("w23", 0.5)
+        self.interquad.setShaderInput("w30", 0.5)
 
-        self.interquad.setShaderInput("w01", self.w01)
-        self.interquad.setShaderInput("w12", self.w12)
-        self.interquad.setShaderInput("w23", self.w23)
-        self.interquad.setShaderInput("w30", self.w30)
-
-        def GeneratePlaneNode(svmBase):
-            # shader setting for SVM
-            svmBase.planeShader = Shader.load(Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps_plane_real.glsl")
-            vdata = p3d.GeomVertexData("triangle_data", p3d.GeomVertexFormat.getV3t2(), p3d.Geom.UHStatic)
-            vdata.setNumRows(4)  # optional for performance enhancement!
-            vertex = p3d.GeomVertexWriter(vdata, "vertex")
-            texcoord = p3d.GeomVertexWriter(vdata, "texcoord")
-
-            bbox = svmBase.boat.getTightBounds()
-            print(bbox)
-            self.waterZ = 0
-            waterPlaneLength = 1000
-            vertex.addData3(-waterPlaneLength, -waterPlaneLength, self.waterZ)
-            vertex.addData3(waterPlaneLength, -waterPlaneLength, self.waterZ)
-            vertex.addData3(waterPlaneLength, waterPlaneLength, self.waterZ)
-            vertex.addData3(-waterPlaneLength, waterPlaneLength, self.waterZ)
-            # not use...
-            texcoord.addData2(0, 1)
-            texcoord.addData2(1, 1)
-            texcoord.addData2(1, 0)
-            texcoord.addData2(0, 0)
-
-            primTris = p3d.GeomTriangles(p3d.Geom.UHStatic)
-            primTris.addVertices(0, 1, 2)
-            primTris.addVertices(0, 2, 3)
-
-            geom = p3d.Geom(vdata)
-            geom.addPrimitive(primTris)
-            geomNode = p3d.GeomNode("SVM Plane")
-            geomNode.addGeom(geom)
-            # note nodePath is the instance for node (obj resource)
-            svmBase.plane = p3d.NodePath(geomNode)
-            svmBase.plane.setTwoSided(True)
-            svmBase.plane.setShader(svmBase.planeShader)
-
-            # the following mat4 array does not work...
-            # matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
-            # svmBase.plane.setShaderInput("matViewProjs", matViewProjs)
-
-            # svmBase.planeTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
-            for i in range(4):
-                svmBase.plane.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-                svmBase.interquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-                svmBase.finalquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-
-            svmBase.planeTexArray = p3d.Texture()
-            svmBase.planeTexArray.setup2dTextureArray(
-                img_width, img_height, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
-            )
-            svmBase.plane.setShaderInput("cameraImgs", svmBase.planeTexArray)
-            svmBase.interquad.setShaderInput("cameraImgs", svmBase.planeTexArray)
-            # svmBase.finalquad.setShaderInput("cameraImgs", svmBase.planeTexArray)
-
-            svmBase.camPositions = [p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f()]
-            svmBase.plane.setShaderInput("camPositions", svmBase.camPositions)
-
-            # initial setting like the above code! (for resource optimization)
-            # svmBase.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
-            svmBase.semanticTexArray = p3d.Texture()
-            svmBase.semanticTexArray.setup2dTextureArray(
-                img_width, img_height, 4, p3d.Texture.T_int, p3d.Texture.F_r32i
-            )
-            print(img_width, img_height)
-            svmBase.plane.setShaderInput("semanticImgs", svmBase.semanticTexArray)
-            svmBase.interquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
-            svmBase.finalquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
-
-        GeneratePlaneNode(self)
+        self.GeneratePlaneNode()
         self.plane.reparentTo(self.renderSVM)
+
+        self.plane.setShaderInput("K1_", K1)
+        self.plane.setShaderInput("K2_", K2)
+        self.plane.setShaderInput("K3_", K3)
+        self.plane.setShaderInput("K4_", K4)
+        self.plane.setShaderInput("K5_", K5)
+
+        self.plane.setShaderInput("img_width_", img_width)
+        self.plane.setShaderInput("img_height_", img_height)
+
+        self.plane.setShaderInput("fx_", fx)
+        self.plane.setShaderInput("fy_", fy)
+        self.plane.setShaderInput("cx_", cx)
+        self.plane.setShaderInput("cy_", cy)
+
+        self.interquad.setShaderInput("K1_", K1)
+        self.interquad.setShaderInput("K2_", K2)
+        self.interquad.setShaderInput("K3_", K3)
+        self.interquad.setShaderInput("K4_", K4)
+        self.interquad.setShaderInput("K5_", K5)
+
+        self.interquad.setShaderInput("img_width_", img_width)
+        self.interquad.setShaderInput("img_height_", img_height)
+
+        self.interquad.setShaderInput("fx_", fx)
+        self.interquad.setShaderInput("fy_", fy)
+        self.interquad.setShaderInput("cx_", cx)
+        self.interquad.setShaderInput("cy_", cy)
+
+        self.finalquad.setShaderInput("K1_", K1)
+        self.finalquad.setShaderInput("K2_", K2)
+        self.finalquad.setShaderInput("K3_", K3)
+        self.finalquad.setShaderInput("K4_", K4)
+        self.finalquad.setShaderInput("K5_", K5)
+
+        self.finalquad.setShaderInput("img_width_", img_width)
+        self.finalquad.setShaderInput("img_height_", img_height)
+
+        self.finalquad.setShaderInput("fx_", fx)
+        self.finalquad.setShaderInput("fy_", fy)
+        self.finalquad.setShaderInput("cx_", cx)
+        self.finalquad.setShaderInput("cy_", cy)
+
         self.accept("r", self.shaderRecompile)
 
         self.bufferViewer.setPosition("llcorner")
@@ -281,6 +254,73 @@ class SurroundView(ShowBase):
         self.taskMgr.add(self.readTextureData, "readTextureData")
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
+
+    def GeneratePlaneNode(self):
+        # shader setting for SVM
+        self.planeShader = Shader.load(
+            Shader.SL_GLSL, vertex="glsl/svm_vs.glsl", fragment="glsl/svm_ps_plane_real.glsl"
+        )
+        vdata = p3d.GeomVertexData("triangle_data", p3d.GeomVertexFormat.getV3t2(), p3d.Geom.UHStatic)
+        vdata.setNumRows(4)  # optional for performance enhancement!
+        vertex = p3d.GeomVertexWriter(vdata, "vertex")
+        texcoord = p3d.GeomVertexWriter(vdata, "texcoord")
+
+        bbox = self.boat.getTightBounds()
+        # print(bbox)
+        self.waterZ = 0
+        waterPlaneLength = 1000
+        vertex.addData3(-waterPlaneLength, -waterPlaneLength, self.waterZ)
+        vertex.addData3(waterPlaneLength, -waterPlaneLength, self.waterZ)
+        vertex.addData3(waterPlaneLength, waterPlaneLength, self.waterZ)
+        vertex.addData3(-waterPlaneLength, waterPlaneLength, self.waterZ)
+        # not use...
+        texcoord.addData2(0, 1)
+        texcoord.addData2(1, 1)
+        texcoord.addData2(1, 0)
+        texcoord.addData2(0, 0)
+
+        primTris = p3d.GeomTriangles(p3d.Geom.UHStatic)
+        primTris.addVertices(0, 1, 2)
+        primTris.addVertices(0, 2, 3)
+
+        geom = p3d.Geom(vdata)
+        geom.addPrimitive(primTris)
+        geomNode = p3d.GeomNode("SVM Plane")
+        geomNode.addGeom(geom)
+        # note nodePath is the instance for node (obj resource)
+        self.plane = p3d.NodePath(geomNode)
+        self.plane.setTwoSided(True)
+        self.plane.setShader(self.planeShader)
+
+        # the following mat4 array does not work...
+        # matViewProjs = [p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f(), p3d.LMatrix4f()]
+        # self.plane.setShaderInput("matViewProjs", matViewProjs)
+
+        # self.planeTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
+        for i in range(4):
+            self.plane.setShaderInput("matViewProj" + str(i), p3d.Mat4())
+            self.interquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
+            self.finalquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
+
+        self.planeTexArray = p3d.Texture()
+        self.planeTexArray.setup2dTextureArray(
+            img_width, img_height, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
+        )
+        self.plane.setShaderInput("cameraImgs", self.planeTexArray)
+        self.interquad.setShaderInput("cameraImgs", self.planeTexArray)
+        # self.finalquad.setShaderInput("cameraImgs", self.planeTexArray)
+
+        self.camPositions = [p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f()]
+        self.plane.setShaderInput("camPositions", self.camPositions)
+
+        # initial setting like the above code! (for resource optimization)
+        # self.semanticTexs = [p3d.Texture(), p3d.Texture(), p3d.Texture(), p3d.Texture()]
+        self.semanticTexArray = p3d.Texture()
+        self.semanticTexArray.setup2dTextureArray(img_width, img_height, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
+        # print(img_width, img_height)
+        self.plane.setShaderInput("semanticImgs", self.semanticTexArray)
+        self.interquad.setShaderInput("semanticImgs", self.semanticTexArray)
+        self.finalquad.setShaderInput("semanticImgs", self.semanticTexArray)
 
     def readTextureData(self, task):
         self.buffer1.set_active(True)
@@ -309,39 +349,49 @@ class SurroundView(ShowBase):
         overlapIndex1 = np.flip(array0[:, :, 0], 0)
         count = np.flip(array0[:, :, 3], 0)
 
-        condition_mask = (mapProp == 2) & (count > 1)
+        semantic = mapProp // 100
+        camId0 = mapProp % 100 // 10
+        camId1 = mapProp % 10
+        overlapIndex0 = np.where(count == 2, overlapIndex0, 255)
+        overlapIndex1 = np.where(count == 2, overlapIndex1, 255)
 
-        camId0 = overlapIndex0[condition_mask]
-        camId1 = overlapIndex1[condition_mask]
+        cam0 = np.where((overlapIndex0 == 0) | (overlapIndex1 == 0), 1, 0)
+        cam1 = np.where((overlapIndex0 == 1) | (overlapIndex1 == 1), 1, 0)
+        cam2 = np.where((overlapIndex0 == 2) | (overlapIndex1 == 2), 1, 0)
+        cam3 = np.where((overlapIndex0 == 3) | (overlapIndex1 == 3), 1, 0)
 
-        combined_array = np.concatenate((camId0, camId1))
+        semantic01 = np.where(cam0 & cam1, semantic, 0)
+        semantic12 = np.where(cam1 & cam2, semantic, 0)
+        semantic23 = np.where(cam2 & cam3, semantic, 0)
+        semantic30 = np.where(cam3 & cam0, semantic, 0)
 
-        element_counts = np.bincount(combined_array, minlength=4)
+        w = [0.5, 0.5, 0.5, 0.5]
 
-        if element_counts[0] > element_counts[1]:
-            self.w01 = 0.1
-        elif element_counts[0] < element_counts[1]:
-            self.w01 = 0.9
+        overlap_semantics = [semantic01, semantic12, semantic23, semantic30]
 
-        if element_counts[1] > element_counts[2]:
-            self.w12 = 0.1
-        elif element_counts[1] < element_counts[2]:
-            self.w12 = 0.9
+        # sets blending weights w based on the highest semantic value
+        for semantic_value in range(1, np.max(semantic) + 1):
+            for i, overlap_semantic in enumerate(overlap_semantics):
+                idx0 = i
+                idx1 = (i + 1) % 4
 
-        if element_counts[2] > element_counts[3]:
-            self.w23 = 0.1
-        elif element_counts[2] < element_counts[3]:
-            self.w23 = 0.9
+                camId0_values = camId0[((camId0 == idx0) | (camId0 == idx1)) & (overlap_semantic == semantic_value)]
+                camId1_values = camId1[((camId1 == idx0) | (camId1 == idx1)) & (overlap_semantic == semantic_value)]
 
-        if element_counts[3] > element_counts[0]:
-            self.w30 = 0.1
-        elif element_counts[3] < element_counts[0]:
-            self.w30 = 0.9
+                idx0_count = np.sum(camId0_values == idx0) + np.sum(camId1_values == idx0)
+                idx1_count = np.sum(camId0_values == idx1) + np.sum(camId1_values == idx1)
 
-        self.interquad.setShaderInput("w01", self.w01)
-        self.interquad.setShaderInput("w12", self.w12)
-        self.interquad.setShaderInput("w23", self.w23)
-        self.interquad.setShaderInput("w30", self.w30)
+                if idx0_count + idx1_count == 0:
+                    continue
+
+                w[i] = idx1_count / (idx0_count + idx1_count)
+
+        w = np.clip(w, 0.1, 0.9)
+
+        self.interquad.setShaderInput("w01", w[0])
+        self.interquad.setShaderInput("w12", w[1])
+        self.interquad.setShaderInput("w23", w[2])
+        self.interquad.setShaderInput("w30", w[3])
 
         # read-back
         tex = self.manager.buffers[1].getTexture(0)
@@ -366,34 +416,40 @@ class SurroundView(ShowBase):
         return task.cont
 
     def shaderRecompile(self):
-        self.planeShader = Shader.load(Shader.SL_GLSL, vertex="svm_vs.glsl", fragment="svm_ps_plane_real.glsl")
+        self.planeShader = Shader.load(
+            Shader.SL_GLSL, vertex="glsl/svm_vs.glsl", fragment="glsl/svm_ps_plane_real.glsl"
+        )
         self.plane.setShader(self.planeShader)
 
-        self.interquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post1_ps_real.glsl"))
-        self.finalquad.setShader(Shader.load(Shader.SL_GLSL, vertex="post1_vs.glsl", fragment="svm_post2_ps_real.glsl"))
+        self.interquad.setShader(
+            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post1_ps_real.glsl")
+        )
+        self.finalquad.setShader(
+            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post2_ps_real.glsl")
+        )
 
 
 def make_extrinsic_matrix(extrinsic):
     defaultYaw = 0
-    camera_position = int(extrinsic["camera_position"])
-    if camera_position == 1:
-        print("position is front")
-        defaultYaw = 0
-    elif camera_position == 2:
-        print("position is blind right")
-        defaultYaw = 90
-    elif camera_position == 3:
-        print("position is blind left")
-        defaultYaw = -90
-    elif camera_position == 4:
-        print("position is right")
-        defaultYaw = 90
-    elif camera_position == 5:
-        print("position is left")
-        defaultYaw = -90
-    elif camera_position == 6:
-        print("position is rear")
-        defaultYaw = 180
+    # camera_position = int(extrinsic["camera_position"])
+    # if camera_position == 1:
+    #     print("position is 1")
+    #     defaultYaw = 0
+    # elif camera_position == 2:
+    #     print("position is 2")
+    #     defaultYaw = 90
+    # elif camera_position == 3:
+    #     print("position is 3")
+    #     defaultYaw = -90
+    # elif camera_position == 4:
+    #     print("position is 4")
+    #     defaultYaw = 90
+    # elif camera_position == 5:
+    #     print("position is 5")
+    #     defaultYaw = -90
+    # elif camera_position == 6:
+    #     print("position is 6")
+    #     defaultYaw = 180
     rotation = [
         -extrinsic["rotation"]["pitch"],
         extrinsic["rotation"]["roll"],
@@ -537,11 +593,28 @@ def InitSVM(base, imageWidth, imageHeight):
     base.semanticTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_int, p3d.Texture.F_r32i)
     base.plane.setShaderInput("semanticImgs", base.semanticTexArray)
 
-    print("Texture Initialized!")
+    # print("Texture Initialized!")
 
 
-base_path = "./data/ws_segmenet"
+base_path = "./src/RM_data3"
 camera_positions = ["front", "right", "rear", "left"]
+
+caps = []
+
+for position in camera_positions:
+    cap = cv.VideoCapture(os.path.join(base_path, position + "_cam.webm"))
+    caps.append(cap)
+
+
+semantic_paths = {
+    position: sorted(
+        [f for f in os.listdir(os.path.join(base_path, "labels")) if f.startswith(position + "_")],
+        key=lambda x: int(x.split("_")[1].split(".")[0]),  # Sort files based on the number in filename
+    )
+    for position in camera_positions
+}
+
+num_images = len(semantic_paths["front"])
 
 current_idx = 0
 
@@ -552,17 +625,14 @@ def loadNextImage(task):
     imgs = []
     semantics = []
 
-    for position in camera_positions:
-        # Load image
-        img = cv.imread(os.path.join(base_path, position, "images", image_paths[position][current_idx]))
+    for i, position in enumerate(camera_positions):
+        caps[i].set(cv.CAP_PROP_POS_FRAMES, current_idx)
+        _, img = caps[i].read()
         img = cv.resize(img, (img_width, img_height))
         img = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
         imgs.append(img)
 
-        # Load semantic image
-        semantic = cv.imread(
-            os.path.join(base_path, position, "pseudo_color_prediction", semantic_paths[position][current_idx])
-        )
+        semantic = cv.imread(os.path.join(base_path, "labels", semantic_paths[position][current_idx]))
         semantic = cv.resize(semantic, (img_width, img_height), cv.INTER_NEAREST)
         semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
         semantics.append(semantic)
@@ -586,22 +656,17 @@ def loadDebugImages():
     imgs = []
     semantics = []
 
-    mapProp = []
-
-    for position in camera_positions:
-        # Load debug image
-        img = cv.imread(f"./{position}.png")
+    for i, position in enumerate(camera_positions):
+        caps[i].set(cv.CAP_PROP_POS_FRAMES, current_idx)
+        _, img = caps[i].read()
         img = cv.resize(img, (img_width, img_height))
         img = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
         imgs.append(img)
 
-        # Load debug semantic image
-        semantic = cv.imread(f"./semantic_{position}.png")
+        semantic = cv.imread(os.path.join(base_path, "labels", semantic_paths[position][current_idx]))
         semantic = cv.resize(semantic, (img_width, img_height), cv.INTER_NEAREST)
         semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
         semantics.append(semantic)
-
-        mapProp.append(np.max(semantic))
 
     imgnpArray = np.array(imgs).astype(np.uint8)
     imgArray = imgnpArray.reshape((4, img_width, img_height, 4))
@@ -611,34 +676,19 @@ def loadDebugImages():
     mySvm.planeTexArray.setRamImage(cameraArray)
     mySvm.semanticTexArray.setRamImage(semanticArray)
 
-    mySvm.w01 = 0.1 if mapProp[0] > mapProp[1] else 0.9 if mapProp[1] > mapProp[0] else 0.5
-    mySvm.w12 = 0.1 if mapProp[1] > mapProp[2] else 0.9 if mapProp[2] > mapProp[1] else 0.5
-    mySvm.w23 = 0.1 if mapProp[2] > mapProp[3] else 0.9 if mapProp[3] > mapProp[2] else 0.5
-    mySvm.w30 = 0.1 if mapProp[3] > mapProp[0] else 0.9 if mapProp[0] > mapProp[3] else 0.5
-
 
 if __name__ == "__main__":
     mySvm = SurroundView()
 
-    if not debug_mode:
-        image_paths = {
-            position: sorted(os.listdir(os.path.join(base_path, position, "images"))) for position in camera_positions
-        }
-        semantic_paths = {
-            position: sorted(os.listdir(os.path.join(base_path, position, "pseudo_color_prediction")))
-            for position in camera_positions
-        }
-        num_images = len(image_paths[camera_positions[0]])
-
     width = mySvm.win.get_x_size()
     height = mySvm.win.get_y_size()
-    print("init w {}, init h {}".format(width, height))
+    # print("init w {}, init h {}".format(width, height))
 
     InitSVM(mySvm, img_width, img_height)
 
     if debug_mode:
         loadDebugImages()
     else:
-        mySvm.taskMgr.add(loadNextImage, "loadNextImageTask", sort=1, uponDeath=exit)
+        mySvm.taskMgr.add(loadNextImage, "LoadNextImageTask")
 
     mySvm.run()
