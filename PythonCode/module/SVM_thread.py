@@ -134,8 +134,8 @@ class SurroundView(ShowBase):
 
         self.boat = self.loader.loadModel("avikus_boat.glb")
         self.boat.setScale(150)
-        self.boat.set_hpr(0, 90, 90)
-        # self.boat.set_hpr(0, 180, 90)
+        # self.boat.set_hpr(90, -90, 0)
+        self.boat.set_hpr(90, 0, 0)
         bbox = self.boat.getTightBounds()
         # print("boat bound : ", bbox)
         center = (bbox[0] + bbox[1]) * 0.5
@@ -613,35 +613,6 @@ def ProcSvmFromPackets(base, numLidars, lidarRes, lidarChs, imageWidth, imageHei
         worldpointlist,
     )
 
-    def generate_depth_maps(shape=(512, 512), sparsity=0.05):
-        """
-        Generates a simulated depth map and its sparse version.
-
-        Parameters:
-        - shape: Shape of the depth map to be generated.
-        - sparsity: Fraction of pixels to be retained in the sparse depth map.
-
-        Returns:
-        - depth_map: Simulated depth map.
-        - sparse_depth: Generated sparse depth map.
-        """
-
-        # Coordinates creation
-        x = np.linspace(-np.pi, np.pi, shape[1])
-        y = np.linspace(-np.pi, np.pi, shape[0])
-        xx, yy = np.meshgrid(x, y)
-
-        # Depth map generation using sinusoidal functions and noise
-        depth_map = np.sin(xx) * np.cos(yy) + np.sin(3 * xx) * np.cos(2 * yy) + 0.5 * np.random.randn(*shape)
-        depth_map = 255 * (depth_map - np.min(depth_map)) / (np.max(depth_map) - np.min(depth_map))
-        depth_map = depth_map.astype(np.uint8)
-
-        # Sparse depth map creation
-        mask = np.random.choice([0, 1], size=depth_map.shape, p=[1 - sparsity, sparsity])
-        sparse_depth = np.where(mask, depth_map, 0)
-
-        return depth_map, sparse_depth
-
     def poisson_interpolation(sparse_map, segmentation_map):
         """
         Interpolates a sparse depth map using the Poisson equation, but only for pixels where segmentation_map equals 1.
@@ -700,13 +671,17 @@ def ProcSvmFromPackets(base, numLidars, lidarRes, lidarChs, imageWidth, imageHei
         solution = spsolve(A.tocsr(), b)
         return solution.reshape(rows, cols)
 
-    # base.pointsVertex.setRow(0)
-    # base.pointsColor.setRow(0)
+    maxNumPoints = base.lidarRes * base.lidarChs * base.numLidars
 
-    # for worldpoint in worldpointlist:
-    #     posPointWS = p3d.LPoint3f(worldpoint[0], worldpoint[1], worldpoint[2])
-    #     base.pointsVertex.setData3f(posPointWS)
-    #     base.pointsColor.setData4f(1, 0, 0, 1)
+    base.pointsVertex.setRow(0)
+    base.pointsColor.setRow(0)
+    for i in range(maxNumPoints):
+        if i < len(worldpointlist):
+            base.pointsVertex.setData3f(worldpointlist[i][0], worldpointlist[i][1], worldpointlist[i][2])
+            base.pointsColor.setData4f(1, 0, 0, 1)
+        else:
+            base.pointsVertex.setData3f(0, 0, 0)
+            base.pointsColor.setData4f(0, 0, 0, 0)
 
     # depthmaps = []
 
