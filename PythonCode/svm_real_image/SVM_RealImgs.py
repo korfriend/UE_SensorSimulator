@@ -9,7 +9,9 @@ from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Shader
 
-debug_mode = False  # Set this variable to True or False to enable or disable debug mode
+debug_mode = 0  # Set this variable to 0 or 1 to enable or disable debug mode
+
+still_shot_mode = False  # Set this variable to True or False to enable or disable still shot mode
 
 with open("./config_raymarine.json") as f:
     calib = json.load(f)
@@ -199,6 +201,9 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w12", 0.5)
         self.interquad.setShaderInput("w23", 0.5)
         self.interquad.setShaderInput("w30", 0.5)
+
+        self.interquad.setShaderInput("debug_mode", debug_mode)
+        self.finalquad.setShaderInput("debug_mode", debug_mode)
 
         self.GeneratePlaneNode()
         self.plane.reparentTo(self.renderSVM)
@@ -686,7 +691,7 @@ if __name__ == "__main__":
 
     InitSVM(mySvm, img_width, img_height)
 
-    if debug_mode:
+    if still_shot_mode:
         loadDebugImages()
     else:
         mySvm.taskMgr.add(loadNextImage, "LoadNextImageTask")

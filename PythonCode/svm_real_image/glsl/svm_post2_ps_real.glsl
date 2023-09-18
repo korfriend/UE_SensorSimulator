@@ -19,19 +19,21 @@ uniform isampler2DArray semanticImgs;
 
 uniform sampler2D tex;
 
-uniform float K1_ = 1.281584985127447;
-uniform float K2_ = 0.170043067138006;
-uniform float K3_ = -0.023341058557079;
-uniform float K4_ = 0.007690791651144;
-uniform float K5_ = -0.001380968639013;
+uniform float K1_;
+uniform float K2_;
+uniform float K3_;
+uniform float K4_;
+uniform float K5_;
 
-uniform float img_width_ = 1920;
-uniform float img_height_ = 1080;
+uniform float img_width_;
+uniform float img_height_;
 
-uniform float fx_ = 345.12136354806347;
-uniform float fy_ = 346.09009197978003;
-uniform float cx_ = 959.5;// - img_width_ / 2;
-uniform float cy_ = 539.5;// - img_height_ / 2;
+uniform float fx_;
+uniform float fy_;
+uniform float cx_;
+uniform float cy_;
+
+uniform int debug_mode;
 
 
 vec2 distortPoint(vec2 Array_uv)
@@ -79,29 +81,31 @@ void main()
     int camId1 = geoInfo0.z;
 
     vec4 colorOut = texture(tex, l_texcoord0);
+    const int debugMode = debug_mode;
+    if (debugMode == 0){
+        // height correction
+        switch (semantic / 100) {
+            case 1: pos.z = -50; break;
+            case 2: pos.z = -50; break;
+        }
 
-    // height correction
-    switch (semantic / 100) {
-        case 1: pos.z = -50; break;
-        case 2: pos.z = -50; break;
-    }
+        int overlapIndex[4] = {int(camId0), int(camId1), 0, 0};
+        semantic = 0;
+        for (int i = 0; i < count; i++) {
+            int camId = overlapIndex[i];
+            vec4 imagePos = viewProjs[camId] * vec4(pos, 1.0);
+            vec2 imagePos2D = imagePos.xy / imagePos.w;
+            vec2 texPos = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+            texPos = distortPoint(texPos);
 
-    int overlapIndex[4] = {int(camId0), int(camId1), 0, 0};
-    semantic = 0;
-    for (int i = 0; i < count; i++) {
-        int camId = overlapIndex[i];
-        vec4 imagePos = viewProjs[camId] * vec4(pos, 1.0);
-        vec2 imagePos2D = imagePos.xy / imagePos.w;
-        vec2 texPos = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
-        texPos = distortPoint(texPos);
+            ivec2 texIdx2d = ivec2((texPos.x) * img_width_ + 0.5, (1 - texPos.y) * img_height_ + 0.5);
+            semantic = max(semantic, texelFetch(semanticImgs, ivec3(texIdx2d, camId), 0).r);
+        }
 
-        ivec2 texIdx2d = ivec2((texPos.x) * img_width_ + 0.5, (1 - texPos.y) * img_height_ + 0.5);
-        semantic = max(semantic, texelFetch(semanticImgs, ivec3(texIdx2d, camId), 0).r);
-    }
-
-    switch (semantic) {
-        case 1: colorOut += vec4(0, 0, 0.2, 1); break;
-        case 2: colorOut += vec4(0.2, 0, 0, 1); break;
+        switch (semantic) {
+            case 1: colorOut += vec4(0, 0, 0.2, 1); break;
+            case 2: colorOut += vec4(0.2, 0, 0, 1); break;
+        }
     }
 
     if (sceneColor.r + sceneColor.g + sceneColor.b > 0)

@@ -16,6 +16,8 @@ import UDP_ReceiverSingle
 
 # from draw_sphere import draw_sphere
 
+debug_mode = 0  # Set this variable to 0 or 1 to enable or disable debug mode
+
 winSizeX = 1024
 winSizeY = 1024
 
@@ -179,6 +181,7 @@ class SurroundView(ShowBase):
         self.finalquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.finalquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.finalquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
+
         self.interquad.setShaderInput("img_w", 256)
         self.interquad.setShaderInput("img_h", 256)
         self.finalquad.setShaderInput("img_w", 256)
@@ -188,6 +191,9 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w12", 0.5)
         self.interquad.setShaderInput("w23", 0.5)
         self.interquad.setShaderInput("w30", 0.5)
+
+        self.interquad.setShaderInput("debug_mode", debug_mode)
+        self.finalquad.setShaderInput("debug_mode", debug_mode)
 
         def GeneratePlaneNode(svmBase):
             # shader setting for SVM

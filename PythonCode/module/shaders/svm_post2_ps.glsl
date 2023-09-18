@@ -24,6 +24,8 @@ uniform sampler2D tex;
 uniform int img_w;
 uniform int img_h;
 
+uniform int debug_mode;
+
 void main()
 {
     mat4 viewProjs[4] = {matViewProj0, matViewProj1, matViewProj2, matViewProj3};
@@ -41,28 +43,30 @@ void main()
     int camId1 = geoInfo0.z;
 
     vec4 colorOut = texture(tex, l_texcoord0);
+    const int debugMode = debug_mode;
+    if (debugMode == 0) {
+        // height correction
+        switch (semantic / 100) {
+            case 1: pos.z = 60; break;
+            case 2: pos.z = 60; break;
+        }
 
-    // height correction
-    switch (semantic / 100) {
-        case 1: pos.z = 60; break;
-        case 2: pos.z = 60; break;
-    }
+        int overlapIndex[4] = {int(camId0), int(camId1), 0, 0};
+        semantic = 0;
+        for (int i = 0; i < count; i++) {
+            int camId = overlapIndex[i];
+            vec4 imagePos = viewProjs[camId] * vec4(pos, 1.0);
+            vec2 imagePos2D = imagePos.xy / imagePos.w;
+            vec2 texPos = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
 
-    int overlapIndex[4] = {int(camId0), int(camId1), 0, 0};
-    semantic = 0;
-    for (int i = 0; i < count; i++) {
-        int camId = overlapIndex[i];
-        vec4 imagePos = viewProjs[camId] * vec4(pos, 1.0);
-        vec2 imagePos2D = imagePos.xy / imagePos.w;
-        vec2 texPos = (imagePos2D + vec2(1.0, 1.0)) * 0.5;
+            ivec2 texIdx2d = ivec2((1 - texPos.x) * img_w + 0.5, (1 - texPos.y) * img_h + 0.5);
+            semantic = max(semantic, texelFetch(semanticImgs, ivec3(texIdx2d, camId), 0).r);
+        }
 
-        ivec2 texIdx2d = ivec2((1 - texPos.x) * img_w + 0.5, (1 - texPos.y) * img_h + 0.5);
-        semantic = max(semantic, texelFetch(semanticImgs, ivec3(texIdx2d, camId), 0).r);
-    }
-
-    switch (semantic) {
-        case 1: colorOut += vec4(0, 0, 0.2, 1); break;
-        case 2: colorOut += vec4(0.2, 0, 0, 1); break;
+        switch (semantic) {
+            case 1: colorOut += vec4(0, 0, 0.2, 1); break;
+            case 2: colorOut += vec4(0.2, 0, 0, 1); break;
+        }
     }
 
     if (sceneColor.r + sceneColor.g + sceneColor.b > 0)

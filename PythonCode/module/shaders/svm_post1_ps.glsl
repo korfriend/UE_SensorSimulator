@@ -27,6 +27,8 @@ uniform float w30;
 uniform int img_w;
 uniform int img_h;
 
+uniform int debug_mode;
+
 vec4 blendArea(int camId0, int camId1, vec3 pos, vec3 pos_original, mat4 viewProjs[4], int caseId, float weightId0, int debugMode) {
     const float bias0 = weightId0;//1.0;
     const float bias1 = 1.0 - weightId0;//1.0;
@@ -164,7 +166,7 @@ void main()
         // case 4: pos.z += 0; break;
     }
     int overlapIndex[4] = {int(camId0), int(camId1), 0, 0};
-    const int debugMode = 0;
+    const int debugMode = debug_mode;
     switch (count) {
         case 1: {
             if(debugMode == 1) {
