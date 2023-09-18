@@ -32,7 +32,4 @@ def toPoints(channel, res, vfov, hfov, depthmap, origin=(0, 0, 0)):
                 # Append the point to the list of points
                 points.append([x, -y, z])
 
-    # Convert the list of points to a numpy array
-    points = np.array(points)
-
     return points

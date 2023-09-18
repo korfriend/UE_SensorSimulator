@@ -159,9 +159,9 @@ def ReceiveData(packetInit: dict, q: queue.Queue):
                     depthmap = struct.unpack(
                         str(lidarRes * lidarChs) + "f", fullPackets[offset : offset + bytesDepthmap]
                     )
-                    depthmapnp = np.array(depthmap, dtype=np.float32)
+                    depthmapnp = np.array(depthmap)
 
-                    worldpointList = DepthToPoint.toPoints(lidarChs, lidarRes, 30, 360, depthmapnp, (0, 0, 450))
+                    worldpointList = DepthToPoint.toPoints(lidarChs, lidarRes, 30, 360, depthmapnp, (0, 0, 500))
 
                     offsetImg = bytesDepthmap + offset
                     imgBytes = bytesRGBmap // (4 + 4)
