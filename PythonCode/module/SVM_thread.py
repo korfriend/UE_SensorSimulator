@@ -16,12 +16,6 @@ import UDP_ReceiverSingle
 
 # from draw_sphere import draw_sphere
 
-# Set the debugMode variable to control the behavior of the script
-# debugMode = 0: Default behavior
-# debugMode = 1: Inpainting will not be performed; instead, the blending area will be visualized
-# debugMode = 2: Inpainting will not be performed; instead, risk factors will be highlighted
-debug_mode = 0
-
 winSizeX = 1024
 winSizeY = 1024
 
@@ -153,6 +147,12 @@ class SurroundView(ShowBase):
         # self.axis.setScale(100)
         # self.axis.reparentTo(self.renderObj)
 
+        # Set the debugMode variable to control the behavior of the script
+        # 0: Default behavior
+        # 1: Inpainting will not be performed; instead, the blending area will be visualized
+        # 2: Inpainting will not be performed; instead, risk factors will be highlighted
+        self.debug_mode = 0
+
         self.isPointCloudSetup = False
         self.lidarRes = 0
         self.lidarChs = 0
@@ -166,12 +166,14 @@ class SurroundView(ShowBase):
         # self.sphere.reparentTo(self.renderObj)
 
         self.manager = FilterManager(self.win, self.cam)
-        tex = p3d.Texture()
+        texInterResult = p3d.Texture()
         self.interquad = self.manager.renderQuadInto(colortex=None)
         self.finalquad = self.manager.renderSceneInto(colortex=None)  # make dummy texture... for post processing...
         self.manager.buffers[0].clearRenderTextures()
         self.manager.buffers[0].addRenderTexture(
-            tex, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color
+            texInterResult,
+            p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram,
+            p3d.GraphicsOutput.RTP_color,
         )
         self.interquad.setShader(
             Shader.load(Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post1_ps.glsl")
@@ -179,7 +181,6 @@ class SurroundView(ShowBase):
         self.finalquad.setShader(
             Shader.load(Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/final_composite_ps.glsl")
         )
-        self.finalquad.setShaderInput("tex", tex)
 
         self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
@@ -197,7 +198,7 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w23", 0.5)
         self.interquad.setShaderInput("w30", 0.5)
 
-        self.interquad.setShaderInput("debug_mode", debug_mode)
+        self.interquad.setShaderInput("debug_mode", self.debug_mode)
 
         def GeneratePlaneNode(svmBase):
             # shader setting for SVM
@@ -282,8 +283,16 @@ class SurroundView(ShowBase):
         self.isPointCloudVisible = True
         self.accept("p", self.toggle_point_cloud_visibility)
 
+        self.accept("1", self.setDebugMode, [0])
+        self.accept("2", self.setDebugMode, [1])
+        self.accept("3", self.setDebugMode, [2])
+
     def toggle_point_cloud_visibility(self):
         self.isPointCloudVisible = not self.isPointCloudVisible
+
+    def setDebugMode(self, mode):
+        self.debug_mode = mode
+        self.interquad.setShaderInput("debug_mode", mode)
 
     def readTextureData(self, task):
         self.buffer1.set_active(True)
@@ -355,12 +364,13 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w23", w[2])
         self.interquad.setShaderInput("w30", w[3])
 
-        if debug_mode == 0:
-            # read-back
-            tex = self.manager.buffers[0].getTexture(0)
-            tex_data = tex.get_ram_image()
+        # read-back
+        texInterResult = self.manager.buffers[0].getTexture(0)
+
+        if self.debug_mode == 0:
+            tex_data = texInterResult.get_ram_image()
             np_texture = np.frombuffer(tex_data, np.uint8)
-            np_texture = np_texture.reshape((tex.get_y_size(), tex.get_x_size(), 4))
+            np_texture = np_texture.reshape((texInterResult.get_y_size(), texInterResult.get_x_size(), 4))
 
             # inpainting
             array = np_texture.copy()
@@ -370,10 +380,15 @@ class SurroundView(ShowBase):
             array = cv.cvtColor(dst, cv.COLOR_BGR2BGRA)
 
             self.texInpaint.setup2dTexture(
-                tex.get_x_size(), tex.get_y_size(), p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
+                texInterResult.get_x_size(),
+                texInterResult.get_y_size(),
+                p3d.Texture.T_unsigned_byte,
+                p3d.Texture.F_rgba,
             )
             self.texInpaint.setRamImage(array)
-            self.finalquad.setShaderInput("tex", self.texInpaint)
+            self.finalquad.setShaderInput("texInterResult", self.texInpaint)
+        else:
+            self.finalquad.setShaderInput("texInterResult", texInterResult)
 
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
