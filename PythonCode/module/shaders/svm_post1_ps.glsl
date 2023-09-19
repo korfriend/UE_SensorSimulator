@@ -105,6 +105,13 @@ vec4 blendArea(int camId0, int camId1, vec3 pos, vec3 pos_original, mat4 viewPro
             colorOut = w0 * img1 + w1 * img2;
         }
 
+        if (debugMode == 2) {
+            if (semantic0 == 2 || semantic1 == 2)
+                colorOut += vec4(0.5, 0, 0, 1);
+            else if (semantic0 == 1 || semantic1 == 1)
+                colorOut += vec4(0, 0, 0.5, 1);
+        }
+
         //colorOut.rgb *= 255.0;
         //colorOut.r = (int(colorOut.r + 2.9)) / 255.0;
         //colorOut.g = (int(colorOut.g + 2.9)) / 255.0;
@@ -193,7 +200,14 @@ void main()
                 }
                 else 
                     colorOut = texture(cameraImgs, vec3((1 - texPos0.x), (1 - texPos0.y), camId));
-            }
+
+                    if (debugMode == 2) {
+                        if (semantic0 == 2)
+                            colorOut += vec4(0.5, 0, 0, 1);
+                        else if (semantic0 == 1)
+                            colorOut += vec4(0, 0, 0.5, 1);
+                    }
+                }
             break;
         }
         case 2: {
