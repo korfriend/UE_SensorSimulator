@@ -9,7 +9,9 @@ from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Shader
 
-debug_mode = False  # Set this variable to True or False to enable or disable debug mode
+debug_mode = 0  # Set this variable to 0 or 1 to enable or disable debug mode
+
+still_shot_mode = False  # Set this variable to True or False to enable or disable still shot mode
 
 with open("./config_raymarine.json") as f:
     calib = json.load(f)
@@ -86,7 +88,7 @@ class SurroundView(ShowBase):
         )  # DO NOT MAKE BUFFER via base.win.makeTextureBuffer for readback-purposed render target (F_rgba32)
         # base.win.makeTextureBuffer create a default render target buffer (F_rgba)
         self.buffer1.setClearColor(p3d.Vec4(0, 0, 0, 0))
-        self.buffer1.setSort(10)
+        # self.buffer1.setSort(10)
 
         # Create the render textures
         tex1 = p3d.Texture()  # self.buffer1.getTexture()
@@ -137,7 +139,7 @@ class SurroundView(ShowBase):
         self.buffer2.addRenderTexture(texP0, p3d.GraphicsOutput.RTM_bind_or_copy, p3d.GraphicsOutput.RTP_color)
 
         self.buffer2.setClearColor(p3d.Vec4(0, 0, 0, 1))
-        self.buffer2.setSort(0)
+        # self.buffer2.setSort(0)
 
         # Set up a camera for the first pass
         self.cam2 = self.makeCamera(self.buffer2, scene=self.renderObj, lens=self.cam.node().getLens())
@@ -175,30 +177,32 @@ class SurroundView(ShowBase):
 
         self.manager = FilterManager(self.win, self.cam)
         tex = p3d.Texture()
-        self.finalquad = self.manager.renderSceneInto(colortex=None)
         self.interquad = self.manager.renderQuadInto(colortex=None)  # make dummy texture... for post processing...
-        self.manager.buffers[1].clearRenderTextures()
-        self.manager.buffers[1].addRenderTexture(
+        self.finalquad = self.manager.renderSceneInto(colortex=None)
+        self.manager.buffers[0].clearRenderTextures()
+        self.manager.buffers[0].addRenderTexture(
             tex, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color
         )
         self.interquad.setShader(
             Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post1_ps_real.glsl")
         )
         self.finalquad.setShader(
-            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post2_ps_real.glsl")
+            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/final_composite_ps_real.glsl")
         )
-        self.finalquad.setShaderInput("tex", self.manager.buffers[1].getTexture(0))
         self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.interquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
-        self.finalquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
-        self.finalquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
+
         self.finalquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
+
+        self.texInpaint = p3d.Texture()
 
         self.interquad.setShaderInput("w01", 0.5)
         self.interquad.setShaderInput("w12", 0.5)
         self.interquad.setShaderInput("w23", 0.5)
         self.interquad.setShaderInput("w30", 0.5)
+
+        self.interquad.setShaderInput("debug_mode", debug_mode)
 
         self.GeneratePlaneNode()
         self.plane.reparentTo(self.renderSVM)
@@ -230,20 +234,6 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("fy_", fy)
         self.interquad.setShaderInput("cx_", cx)
         self.interquad.setShaderInput("cy_", cy)
-
-        self.finalquad.setShaderInput("K1_", K1)
-        self.finalquad.setShaderInput("K2_", K2)
-        self.finalquad.setShaderInput("K3_", K3)
-        self.finalquad.setShaderInput("K4_", K4)
-        self.finalquad.setShaderInput("K5_", K5)
-
-        self.finalquad.setShaderInput("img_width_", img_width)
-        self.finalquad.setShaderInput("img_height_", img_height)
-
-        self.finalquad.setShaderInput("fx_", fx)
-        self.finalquad.setShaderInput("fy_", fy)
-        self.finalquad.setShaderInput("cx_", cx)
-        self.finalquad.setShaderInput("cy_", cy)
 
         self.accept("r", self.shaderRecompile)
 
@@ -300,7 +290,6 @@ class SurroundView(ShowBase):
         for i in range(4):
             self.plane.setShaderInput("matViewProj" + str(i), p3d.Mat4())
             self.interquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-            self.finalquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
 
         self.planeTexArray = p3d.Texture()
         self.planeTexArray.setup2dTextureArray(
@@ -308,7 +297,6 @@ class SurroundView(ShowBase):
         )
         self.plane.setShaderInput("cameraImgs", self.planeTexArray)
         self.interquad.setShaderInput("cameraImgs", self.planeTexArray)
-        # self.finalquad.setShaderInput("cameraImgs", self.planeTexArray)
 
         self.camPositions = [p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f()]
         self.plane.setShaderInput("camPositions", self.camPositions)
@@ -320,12 +308,10 @@ class SurroundView(ShowBase):
         # print(img_width, img_height)
         self.plane.setShaderInput("semanticImgs", self.semanticTexArray)
         self.interquad.setShaderInput("semanticImgs", self.semanticTexArray)
-        self.finalquad.setShaderInput("semanticImgs", self.semanticTexArray)
 
     def readTextureData(self, task):
         self.buffer1.set_active(True)
         self.buffer2.set_active(True)
-        self.manager.buffers[1].set_active(True)
         self.win.set_active(False)
         self.graphics_engine.render_frame()
 
@@ -394,7 +380,7 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w30", w[3])
 
         # read-back
-        tex = self.manager.buffers[1].getTexture(0)
+        tex = self.manager.buffers[0].getTexture(0)
         tex_data = tex.get_ram_image()
         np_texture = np.frombuffer(tex_data, np.uint8)
         np_texture = np_texture.reshape((tex.get_y_size(), tex.get_x_size(), 4))
@@ -406,12 +392,14 @@ class SurroundView(ShowBase):
         dst = cv.inpaint(img, mask, 3, cv.INPAINT_TELEA)
         array = cv.cvtColor(dst, cv.COLOR_BGR2BGRA)
 
-        tex.setRamImage(array)
-        self.finalquad.setShaderInput("tex", tex)
+        self.texInpaint.setup2dTexture(
+            tex.get_x_size(), tex.get_y_size(), p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
+        )
+        self.texInpaint.setRamImage(array)
+        self.finalquad.setShaderInput("tex", self.texInpaint)
 
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
-        self.manager.buffers[1].set_active(False)
         self.win.set_active(True)
         return task.cont
 
@@ -425,7 +413,7 @@ class SurroundView(ShowBase):
             Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post1_ps_real.glsl")
         )
         self.finalquad.setShader(
-            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/svm_post2_ps_real.glsl")
+            Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/final_composite_ps_real.glsl")
         )
 
 
@@ -585,7 +573,6 @@ def InitSVM(base, imageWidth, imageHeight):
 
         base.plane.setShaderInput("matViewProj" + str(i), matViewProj)
         base.interquad.setShaderInput("matViewProj" + str(i), matViewProj)
-        base.finalquad.setShaderInput("matViewProj" + str(i), matViewProj)
 
     base.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
     base.plane.setShaderInput("cameraImgs", base.planeTexArray)
@@ -686,7 +673,7 @@ if __name__ == "__main__":
 
     InitSVM(mySvm, img_width, img_height)
 
-    if debug_mode:
+    if still_shot_mode:
         loadDebugImages()
     else:
         mySvm.taskMgr.add(loadNextImage, "LoadNextImageTask")
