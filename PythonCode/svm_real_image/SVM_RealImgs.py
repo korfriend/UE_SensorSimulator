@@ -9,7 +9,11 @@ from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Shader
 
-debug_mode = 0  # Set this variable to 0 or 1 to enable or disable debug mode
+# Set the debugMode variable to control the behavior of the script
+# debugMode = 0: Default behavior
+# debugMode = 1: Inpainting will not be performed; instead, the blending area will be visualized
+# debugMode = 2: Inpainting will not be performed; instead, risk factors will be highlighted
+debug_mode = 0
 
 still_shot_mode = False  # Set this variable to True or False to enable or disable still shot mode
 
@@ -189,6 +193,8 @@ class SurroundView(ShowBase):
         self.finalquad.setShader(
             Shader.load(Shader.SL_GLSL, vertex="glsl/post1_vs.glsl", fragment="glsl/final_composite_ps_real.glsl")
         )
+        self.finalquad.setShaderInput("tex", tex)
+
         self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.interquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
@@ -379,24 +385,25 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w23", w[2])
         self.interquad.setShaderInput("w30", w[3])
 
-        # read-back
-        tex = self.manager.buffers[0].getTexture(0)
-        tex_data = tex.get_ram_image()
-        np_texture = np.frombuffer(tex_data, np.uint8)
-        np_texture = np_texture.reshape((tex.get_y_size(), tex.get_x_size(), 4))
+        if debug_mode == 0:
+            # read-back
+            tex = self.manager.buffers[0].getTexture(0)
+            tex_data = tex.get_ram_image()
+            np_texture = np.frombuffer(tex_data, np.uint8)
+            np_texture = np_texture.reshape((tex.get_y_size(), tex.get_x_size(), 4))
 
-        # inpainting
-        array = np_texture.copy()
-        img = cv.cvtColor(array, cv.COLOR_BGRA2BGR)
-        mask = cv.inRange(img, (0, 0, 0), (0, 0, 0))
-        dst = cv.inpaint(img, mask, 3, cv.INPAINT_TELEA)
-        array = cv.cvtColor(dst, cv.COLOR_BGR2BGRA)
+            # inpainting
+            array = np_texture.copy()
+            img = cv.cvtColor(array, cv.COLOR_BGRA2BGR)
+            mask = cv.inRange(img, (0, 0, 0), (0, 0, 0))
+            dst = cv.inpaint(img, mask, 3, cv.INPAINT_TELEA)
+            array = cv.cvtColor(dst, cv.COLOR_BGR2BGRA)
 
-        self.texInpaint.setup2dTexture(
-            tex.get_x_size(), tex.get_y_size(), p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
-        )
-        self.texInpaint.setRamImage(array)
-        self.finalquad.setShaderInput("tex", self.texInpaint)
+            self.texInpaint.setup2dTexture(
+                tex.get_x_size(), tex.get_y_size(), p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
+            )
+            self.texInpaint.setRamImage(array)
+            self.finalquad.setShaderInput("tex", self.texInpaint)
 
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
