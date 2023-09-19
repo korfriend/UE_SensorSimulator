@@ -178,14 +178,13 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.interquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
-        self.finalquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
-        self.finalquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
+
         self.finalquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
+
+        self.texInpaint = p3d.Texture()
 
         self.interquad.setShaderInput("img_w", 256)
         self.interquad.setShaderInput("img_h", 256)
-        self.finalquad.setShaderInput("img_w", 256)
-        self.finalquad.setShaderInput("img_h", 256)
 
         self.interquad.setShaderInput("w01", 0.5)
         self.interquad.setShaderInput("w12", 0.5)
@@ -193,7 +192,6 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w30", 0.5)
 
         self.interquad.setShaderInput("debug_mode", debug_mode)
-        self.finalquad.setShaderInput("debug_mode", debug_mode)
 
         def GeneratePlaneNode(svmBase):
             # shader setting for SVM
@@ -242,14 +240,12 @@ class SurroundView(ShowBase):
                 svmBase.plane.setShaderInput("matViewProj" + str(i), p3d.Mat4())
                 # svmBase.sphere.setShaderInput("matViewProj" + str(i), p3d.Mat4())
                 svmBase.interquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-                svmBase.finalquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
 
             svmBase.planeTexArray = p3d.Texture()
             svmBase.planeTexArray.setup2dTextureArray(256, 256, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
             svmBase.plane.setShaderInput("cameraImgs", svmBase.planeTexArray)
             # svmBase.sphere.setShaderInput("cameraImgs", svmBase.planeTexArray)
             svmBase.interquad.setShaderInput("cameraImgs", svmBase.planeTexArray)
-            # svmBase.finalquad.setShaderInput("cameraImgs", svmBase.planeTexArray)
 
             svmBase.camPositions = [p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f()]
             svmBase.plane.setShaderInput("camPositions", svmBase.camPositions)
@@ -261,7 +257,6 @@ class SurroundView(ShowBase):
             svmBase.plane.setShaderInput("semanticImgs", svmBase.semanticTexArray)
             # svmBase.sphere.setShaderInput("semanticImgs", svmBase.semanticTexArray)
             svmBase.interquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
-            svmBase.finalquad.setShaderInput("semanticImgs", svmBase.semanticTexArray)
 
             # zeros = np.ones((4, 256, 256), dtype=np.int32)
             # svmBase.semanticTexArray.setRamImage(zeros)
@@ -367,10 +362,11 @@ class SurroundView(ShowBase):
         dst = cv.inpaint(img, mask, 3, cv.INPAINT_TELEA)
         array = cv.cvtColor(dst, cv.COLOR_BGR2BGRA)
 
-        texInpaint = p3d.Texture()
-        texInpaint.setup2dTexture(tex.get_x_size(), tex.get_y_size(), p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
-        texInpaint.setRamImage(array)
-        self.finalquad.setShaderInput("tex", texInpaint)
+        self.texInpaint.setup2dTexture(
+            tex.get_x_size(), tex.get_y_size(), p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
+        )
+        self.texInpaint.setRamImage(array)
+        self.finalquad.setShaderInput("tex", self.texInpaint)
 
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
@@ -586,7 +582,6 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
         base.plane.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
         # print("plane.setShaderInput")
         base.interquad.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
-        base.finalquad.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
         # print("plane.setShaderInput")
         # base.sphere.setShaderInput("matViewProj" + str(imgIdx), viewProjMat)
         # print("plane.setShaderInput")
@@ -606,9 +601,6 @@ def InitSVM(base, numLidars, lidarRes, lidarChs, imageWidth, imageHeight, imgs, 
 
     base.interquad.setShaderInput("img_w", imageWidth)
     base.interquad.setShaderInput("img_h", imageHeight)
-
-    base.finalquad.setShaderInput("img_w", imageWidth)
-    base.finalquad.setShaderInput("img_h", imageHeight)
 
     # print("Texture Initialized!")
 

@@ -192,9 +192,10 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
         self.interquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
-        self.finalquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
-        self.finalquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
+
         self.finalquad.setShaderInput("texGeoInfo2", self.buffer2.getTexture(0))
+
+        self.texInpaint = p3d.Texture()
 
         self.interquad.setShaderInput("w01", 0.5)
         self.interquad.setShaderInput("w12", 0.5)
@@ -202,7 +203,6 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w30", 0.5)
 
         self.interquad.setShaderInput("debug_mode", debug_mode)
-        self.finalquad.setShaderInput("debug_mode", debug_mode)
 
         self.GeneratePlaneNode()
         self.plane.reparentTo(self.renderSVM)
@@ -234,20 +234,6 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("fy_", fy)
         self.interquad.setShaderInput("cx_", cx)
         self.interquad.setShaderInput("cy_", cy)
-
-        self.finalquad.setShaderInput("K1_", K1)
-        self.finalquad.setShaderInput("K2_", K2)
-        self.finalquad.setShaderInput("K3_", K3)
-        self.finalquad.setShaderInput("K4_", K4)
-        self.finalquad.setShaderInput("K5_", K5)
-
-        self.finalquad.setShaderInput("img_width_", img_width)
-        self.finalquad.setShaderInput("img_height_", img_height)
-
-        self.finalquad.setShaderInput("fx_", fx)
-        self.finalquad.setShaderInput("fy_", fy)
-        self.finalquad.setShaderInput("cx_", cx)
-        self.finalquad.setShaderInput("cy_", cy)
 
         self.accept("r", self.shaderRecompile)
 
@@ -304,7 +290,6 @@ class SurroundView(ShowBase):
         for i in range(4):
             self.plane.setShaderInput("matViewProj" + str(i), p3d.Mat4())
             self.interquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
-            self.finalquad.setShaderInput("matViewProj" + str(i), p3d.Mat4())
 
         self.planeTexArray = p3d.Texture()
         self.planeTexArray.setup2dTextureArray(
@@ -312,7 +297,6 @@ class SurroundView(ShowBase):
         )
         self.plane.setShaderInput("cameraImgs", self.planeTexArray)
         self.interquad.setShaderInput("cameraImgs", self.planeTexArray)
-        # self.finalquad.setShaderInput("cameraImgs", self.planeTexArray)
 
         self.camPositions = [p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f(), p3d.LVector4f()]
         self.plane.setShaderInput("camPositions", self.camPositions)
@@ -324,7 +308,6 @@ class SurroundView(ShowBase):
         # print(img_width, img_height)
         self.plane.setShaderInput("semanticImgs", self.semanticTexArray)
         self.interquad.setShaderInput("semanticImgs", self.semanticTexArray)
-        self.finalquad.setShaderInput("semanticImgs", self.semanticTexArray)
 
     def readTextureData(self, task):
         self.buffer1.set_active(True)
@@ -409,10 +392,11 @@ class SurroundView(ShowBase):
         dst = cv.inpaint(img, mask, 3, cv.INPAINT_TELEA)
         array = cv.cvtColor(dst, cv.COLOR_BGR2BGRA)
 
-        texInpaint = p3d.Texture()
-        texInpaint.setup2dTexture(tex.get_x_size(), tex.get_y_size(), p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
-        texInpaint.setRamImage(array)
-        self.finalquad.setShaderInput("tex", texInpaint)
+        self.texInpaint.setup2dTexture(
+            tex.get_x_size(), tex.get_y_size(), p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba
+        )
+        self.texInpaint.setRamImage(array)
+        self.finalquad.setShaderInput("tex", self.texInpaint)
 
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
@@ -589,7 +573,6 @@ def InitSVM(base, imageWidth, imageHeight):
 
         base.plane.setShaderInput("matViewProj" + str(i), matViewProj)
         base.interquad.setShaderInput("matViewProj" + str(i), matViewProj)
-        base.finalquad.setShaderInput("matViewProj" + str(i), matViewProj)
 
     base.planeTexArray.setup2dTextureArray(imageWidth, imageHeight, 4, p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
     base.plane.setShaderInput("cameraImgs", base.planeTexArray)
