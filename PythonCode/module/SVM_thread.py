@@ -65,7 +65,7 @@ class SurroundView(ShowBase):
         )  # DO NOT MAKE BUFFER via base.win.makeTextureBuffer for readback-purposed render target (F_rgba32)
         # base.win.makeTextureBuffer create a default render target buffer (F_rgba)
         self.buffer1.setClearColor(p3d.Vec4(0, 0, 0, 0))
-        self.buffer1.setSort(10)
+        # self.buffer1.setSort(10)
 
         # Create the render textures
         tex1 = p3d.Texture()  # self.buffer1.getTexture()
@@ -117,7 +117,7 @@ class SurroundView(ShowBase):
         self.buffer2.addRenderTexture(texP0, p3d.GraphicsOutput.RTM_bind_or_copy, p3d.GraphicsOutput.RTP_color)
 
         self.buffer2.setClearColor(p3d.Vec4(0, 0, 0, 1))
-        self.buffer2.setSort(0)
+        # self.buffer2.setSort(0)
 
         # Set up a camera for the first pass
         self.cam2 = self.makeCamera(self.buffer2, scene=self.renderObj, lens=self.cam.node().getLens())
@@ -163,17 +163,17 @@ class SurroundView(ShowBase):
 
         self.manager = FilterManager(self.win, self.cam)
         tex = p3d.Texture()
-        self.finalquad = self.manager.renderSceneInto(colortex=None)  # make dummy texture... for post processing...
         self.interquad = self.manager.renderQuadInto(colortex=None)
-        self.manager.buffers[1].clearRenderTextures()
-        self.manager.buffers[1].addRenderTexture(
+        self.finalquad = self.manager.renderSceneInto(colortex=None)  # make dummy texture... for post processing...
+        self.manager.buffers[0].clearRenderTextures()
+        self.manager.buffers[0].addRenderTexture(
             tex, p3d.GraphicsOutput.RTM_bind_or_copy | p3d.GraphicsOutput.RTM_copy_ram, p3d.GraphicsOutput.RTP_color
         )
         self.interquad.setShader(
             Shader.load(Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post1_ps.glsl")
         )
         self.finalquad.setShader(
-            Shader.load(Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post2_ps.glsl")
+            Shader.load(Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/final_composite_ps.glsl")
         )
         self.interquad.setShaderInput("texGeoInfo0", self.buffer1.getTexture(0))
         self.interquad.setShaderInput("texGeoInfo1", self.buffer1.getTexture(1))
@@ -287,7 +287,6 @@ class SurroundView(ShowBase):
     def readTextureData(self, task):
         self.buffer1.set_active(True)
         self.buffer2.set_active(True)
-        self.manager.buffers[1].set_active(True)
         self.win.set_active(False)
         self.graphics_engine.render_frame()
 
@@ -356,7 +355,7 @@ class SurroundView(ShowBase):
         self.interquad.setShaderInput("w30", w[3])
 
         # read-back
-        tex = self.manager.buffers[1].getTexture(0)
+        tex = self.manager.buffers[0].getTexture(0)
         tex_data = tex.get_ram_image()
         np_texture = np.frombuffer(tex_data, np.uint8)
         np_texture = np_texture.reshape((tex.get_y_size(), tex.get_x_size(), 4))
@@ -368,12 +367,13 @@ class SurroundView(ShowBase):
         dst = cv.inpaint(img, mask, 3, cv.INPAINT_TELEA)
         array = cv.cvtColor(dst, cv.COLOR_BGR2BGRA)
 
-        tex.setRamImage(array)
-        self.finalquad.setShaderInput("tex", tex)
+        texInpaint = p3d.Texture()
+        texInpaint.setup2dTexture(tex.get_x_size(), tex.get_y_size(), p3d.Texture.T_unsigned_byte, p3d.Texture.F_rgba)
+        texInpaint.setRamImage(array)
+        self.finalquad.setShaderInput("tex", texInpaint)
 
         self.buffer1.set_active(False)
         self.buffer2.set_active(False)
-        self.manager.buffers[1].set_active(False)
         self.win.set_active(True)
         return task.cont
 
@@ -389,7 +389,7 @@ class SurroundView(ShowBase):
             Shader.load(Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post1_ps.glsl")
         )
         self.finalquad.setShader(
-            Shader.load(Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/svm_post2_ps.glsl")
+            Shader.load(Shader.SL_GLSL, vertex="./shaders/post1_vs.glsl", fragment="./shaders/final_composite_ps.glsl")
         )
 
 
