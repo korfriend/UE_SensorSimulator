@@ -5,8 +5,6 @@ precision highp int;
 in vec2 l_texcoord0;
 out vec4 p3d_FragColor;
 
-uniform isampler2D texGeoInfo0;
-uniform isampler2D texGeoInfo1;
 uniform sampler2D texGeoInfo2; // from sceneObj
 
 uniform sampler2D tex;
