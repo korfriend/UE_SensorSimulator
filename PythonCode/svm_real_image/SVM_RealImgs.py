@@ -609,21 +609,16 @@ base_path = "./src/RM_data3"
 camera_positions = ["front", "right", "rear", "left"]
 
 caps = []
+semantic_caps = []
 
 for position in camera_positions:
     cap = cv.VideoCapture(os.path.join(base_path, position + "_cam.webm"))
     caps.append(cap)
 
+    semantic_cap = cv.VideoCapture(os.path.join(base_path, "semantic_" + position + ".webm"))
+    semantic_caps.append(semantic_cap)
 
-semantic_paths = {
-    position: sorted(
-        [f for f in os.listdir(os.path.join(base_path, "labels")) if f.startswith(position + "_")],
-        key=lambda x: int(x.split("_")[1].split(".")[0]),  # Sort files based on the number in filename
-    )
-    for position in camera_positions
-}
-
-num_images = len(semantic_paths["front"])
+num_images = int(caps[0].get(cv.CAP_PROP_FRAME_COUNT))
 
 current_idx = 0
 
@@ -641,7 +636,8 @@ def loadNextImage(task):
         img = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
         imgs.append(img)
 
-        semantic = cv.imread(os.path.join(base_path, "labels", semantic_paths[position][current_idx]))
+        semantic_caps[i].set(cv.CAP_PROP_POS_FRAMES, current_idx)
+        _, semantic = semantic_caps[i].read()
         semantic = cv.resize(semantic, (img_width, img_height), cv.INTER_NEAREST)
         semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
         semantics.append(semantic)
@@ -672,7 +668,8 @@ def loadDebugImages():
         img = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
         imgs.append(img)
 
-        semantic = cv.imread(os.path.join(base_path, "labels", semantic_paths[position][current_idx]))
+        semantic_caps[i].set(cv.CAP_PROP_POS_FRAMES, current_idx)
+        _, semantic = semantic_caps[i].read()
         semantic = cv.resize(semantic, (img_width, img_height), cv.INTER_NEAREST)
         semantic = cv.cvtColor(semantic, cv.COLOR_BGR2GRAY)
         semantics.append(semantic)
